@@ -51,12 +51,12 @@ function parseDateInput(dateStr: string, timezone: string): Date {
  * @param server The MCP server instance
  */
 export function registerCalendarTools(server: McpServer): void {
-  // Define the schema for the tool parameters with hardcoded defaults
+  // Define the schema for the tool parameters
   const paramsSchema = {
-    user_id: z.string().default("me").describe("Microsoft Graph user ID or 'me' for current user"),
-    start_date: z.string().default("2025-06-18").describe("Start date in YYYY-MM-DD format (default: 2025-06-18)"),
-    end_date: z.string().default("2025-06-19").describe("End date in YYYY-MM-DD format (default: 2025-06-19)"),
-    timezone: z.string().default("Asia/Manila").describe("IANA timezone (e.g., 'Asia/Manila')")
+    user_id: z.string().describe("Microsoft Graph user ID or 'me' for current user"),
+    start_date: z.string().describe("Start date in YYYY-MM-DD format"),
+    end_date: z.string().describe("End date in YYYY-MM-DD format"),
+    timezone: z.string().describe("IANA timezone (e.g., 'Asia/Manila')")
   };
 
   // Register the tool with the server
