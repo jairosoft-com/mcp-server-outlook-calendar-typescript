@@ -102,16 +102,28 @@ export function registerCalendarTools(server: McpServer): void {
         let eventsSummary = `📅 Found ${formattedEvents.length} events between ${start_date} and ${end_date}\n\n`;
         
         if (formattedEvents.length > 0) {
-          eventsSummary += (formattedEvents as unknown as CalendarEvent[]).map((event, index) => {
+          eventsSummary += formattedEvents.map((event: any, index) => {
             const startTime = formatEventTime(event.start.dateTime);
             const endTime = formatEventTime(event.end.dateTime);
-            const organizerName = event.organizer?.emailAddress?.name || 'No organizer';
-            const attendeeCount = event.attendees?.length || 0;
+            const organizerName = event.organizer?.name || 'No organizer';
+            const organizerEmail = event.organizer?.email ? ` <${event.organizer.email}>` : '';
+            const attendees = event.attendees || [];
+            const attendeeCount = attendees.length;
+            
+            let attendeeList = '';
+            if (attendeeCount > 0) {
+              attendeeList = '   👥 Attendees:\n' + 
+                attendees.map((attendee: { name?: string; email?: string }) => {
+                  const name = attendee.name || 'No name';
+                  const email = attendee.email ? ` <${attendee.email}>` : '';
+                  return `      • ${name}${email}`;
+                }).join('\n');
+            }
             
             return `${index + 1}. ${event.subject || 'No Subject'}\n` +
                    `   📅 ${startTime} - ${endTime}\n` +
-                   `   👤 ${organizerName}\n` +
-                   (attendeeCount > 0 ? `   👥 ${attendeeCount} attendee${attendeeCount > 1 ? 's' : ''}\n` : '') +
+                   `   👤 Organizer: ${organizerName}${organizerEmail}\n` +
+                   (attendeeCount > 0 ? `${attendeeList}\n` : '   👥 No attendees\n') +
                    (event.bodyPreview ? `   📝 ${event.bodyPreview.substring(0, 100)}${event.bodyPreview.length > 100 ? '...' : ''}\n` : '') +
                    (event.webLink ? `   🔗 ${event.webLink}\n` : '');
           }).join('\n');
@@ -141,6 +153,24 @@ export function registerCalendarTools(server: McpServer): void {
               resource: {
                 text: "Detailed Calendar Events",
                 uri: `data:application/json,${encodeURIComponent(JSON.stringify(responseData))}`,
+                mimeType: "application/json"
+              }
+            },
+            // Add raw events for debugging
+            {
+              type: "resource",
+              resource: {
+                text: "Raw Events (Debug)",
+                uri: `data:application/json,${encodeURIComponent(JSON.stringify(events, null, 2))}`,
+                mimeType: "application/json"
+              }
+            },
+            // Add formatted events for debugging
+            {
+              type: "resource",
+              resource: {
+                text: "Formatted Events (Debug)",
+                uri: `data:application/json,${encodeURIComponent(JSON.stringify(formattedEvents, null, 2))}`,
                 mimeType: "application/json"
               }
             }

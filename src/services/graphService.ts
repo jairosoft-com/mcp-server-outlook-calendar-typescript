@@ -20,7 +20,11 @@ export interface CalendarEvent {
     timeZone: string;
   };
   organizer: {
-    emailAddress: {
+    emailAddress?: {
+      address: string;
+      name: string;
+    };
+    email_address?: {
       address: string;
       name: string;
     };
@@ -31,7 +35,11 @@ export interface CalendarEvent {
       response: string;
       time: string;
     };
-    emailAddress: {
+    emailAddress?: {
+      address: string;
+      name: string;
+    };
+    email_address?: {
       address: string;
       name: string;
     };
@@ -118,22 +126,40 @@ export async function fetchCalendarEvents(
  * @returns Formatted events array
  */
 export function formatCalendarEvents(events: CalendarEvent[]) {
-  return events.map(event => ({
-    id: event.id,
-    subject: event.subject || 'No subject',
-    start: event.start,
-    end: event.end,
-    organizer: {
-      name: event.organizer?.emailAddress?.name || 'Unknown',
-      email: event.organizer?.emailAddress?.address
-    },
-    attendees: event.attendees?.map(attendee => ({
-      name: attendee.emailAddress?.name || 'Unknown',
-      email: attendee.emailAddress?.address,
-      type: attendee.type,
-      status: attendee.status?.response
-    })) || [],
-    bodyPreview: event.bodyPreview,
-    webLink: event.webLink
-  }));
+  return events.map(event => {
+    // Extract organizer info
+    const organizerName = event.organizer?.emailAddress?.name || 
+                         event.organizer?.email_address?.name || 'Unknown';
+    const organizerEmail = event.organizer?.emailAddress?.address || 
+                          event.organizer?.email_address?.address;
+    
+    // Process attendees
+    const attendees = event.attendees?.map(attendee => {
+      const name = attendee.emailAddress?.name || 
+                 attendee.email_address?.name || 'Unknown';
+      const email = attendee.emailAddress?.address || 
+                  attendee.email_address?.address;
+      
+      return {
+        name,
+        email,
+        type: attendee.type,
+        status: attendee.status?.response
+      };
+    }) || [];
+    
+    return {
+      id: event.id,
+      subject: event.subject || 'No subject',
+      start: event.start,
+      end: event.end,
+      organizer: {
+        name: organizerName,
+        email: organizerEmail
+      },
+      attendees,
+      bodyPreview: event.bodyPreview,
+      webLink: event.webLink
+    };
+  });
 }
