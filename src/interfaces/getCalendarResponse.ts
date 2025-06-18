@@ -25,3 +25,12 @@ export type FormattedEvent = {
     organizer: string;
     attendees: number;
   };
+
+type ContentItem = 
+| { type: "text"; text: string }
+| { type: "resource"; resource: { text: string; uri: string; mimeType?: string } };
+
+export default interface ToolResponse {
+  content: ContentItem[];
+  [key: string]: unknown; // Allow additional properties
+}

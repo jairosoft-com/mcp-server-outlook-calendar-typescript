@@ -1,28 +1,13 @@
 import { z } from "zod";
-import { format } from "date-fns";
 import { toZonedTime, formatInTimeZone } from "date-fns-tz";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { fetchCalendarEvents, formatCalendarEvents, type CalendarEvent } from "../services/graphService.js";
-import { formatCalendarToolResponse } from "../utils/helper.js";
 
-// Define the expected shape of the tool arguments
-interface CalendarToolArgs {
-  user_id: string;
-  start_date: string;
-  end_date: string;
-  timezone: string;
-  [key: string]: unknown; // Allow additional properties
-}
-
-// Define the content types for the MCP response
-type ContentItem = 
-  | { type: "text"; text: string }
-  | { type: "resource"; resource: { text: string; uri: string; mimeType?: string } };
-
-interface ToolResponse {
-  content: ContentItem[];
-  [key: string]: unknown; // Allow additional properties
-}
+// Load environment variables
+import dotenv from 'dotenv';
+import ToolResponse from "../interfaces/getCalendarResponse.js";
+dotenv.config();
+import CalendarToolArgs from "../interfaces/calendarArgs.js";
 
 /**
  * Validates and parses date input from the user
@@ -51,12 +36,18 @@ function parseDateInput(dateStr: string, timezone: string): Date {
  * @param server The MCP server instance
  */
 export function registerCalendarTools(server: McpServer): void {
-  // Define the schema for the tool parameters
+  // Define the schema for the tool parameters with defaults
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
   const paramsSchema = {
-    user_id: z.string().describe("Microsoft Graph user ID or 'me' for current user"),
-    start_date: z.string().describe("Start date in YYYY-MM-DD format"),
-    end_date: z.string().describe("End date in YYYY-MM-DD format"),
-    timezone: z.string().describe("IANA timezone (e.g., 'Asia/Manila')")
+    user_id: z.string().default("me").describe("Microsoft Graph user ID or 'me' to use USER_ID from .env"),
+    start_date: z.string().default(today).describe("Start date in YYYY-MM-DD format (default: today)"),
+    end_date: z.string().default(tomorrowStr).describe("End date in YYYY-MM-DD format (default: tomorrow)"),
+    timezone: z.string().default("Asia/Manila").describe("IANA timezone (default: Asia/Manila)")
   };
 
   // Register the tool with the server
@@ -65,12 +56,30 @@ export function registerCalendarTools(server: McpServer): void {
     "Fetch calendar events for a user within a date range",
     paramsSchema,
     async (args: unknown) => {
-      // Validate and parse the input arguments
-      const { user_id, start_date, end_date, timezone } = args as CalendarToolArgs;
+      // Get parameters with defaults
+      let { 
+        user_id = 'me', 
+        start_date = today, 
+        end_date = tomorrowStr, 
+        timezone = 'Asia/Manila' 
+      } = args as CalendarToolArgs;
+      
+      // If user_id is 'me', use the USER_ID from .env
+      if (user_id === 'me') {
+        if (!process.env.USER_ID) {
+          return {
+            content: [{
+              type: "text",
+              text: "Error: USER_ID is not set in .env file"
+            }]
+          };
+        }
+        user_id = process.env.USER_ID;
+      }
       try {
-        // Parse and validate dates
-        const startDate = parseDateInput(start_date, timezone);
-        const endDate = parseDateInput(end_date, timezone);
+        // Parse dates with provided or default values
+        const startDate = parseDateInput(start_date || today, timezone || 'Asia/Manila');
+        const endDate = parseDateInput(end_date || tomorrowStr, timezone || 'Asia/Manila');
         
         // Add one day to end date to include the full day
         endDate.setDate(endDate.getDate() + 1);
@@ -137,13 +146,7 @@ export function registerCalendarTools(server: McpServer): void {
             }
           ]
         };
-        const uri = response.content.find(c => c.type === 'resource')?.resource?.uri;
-        let eventsResponse: any;
-        if (uri) {
-          eventsResponse = formatCalendarToolResponse(uri);
-          return eventsResponse;
-        }
-        else return [];
+        return response;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         return {
