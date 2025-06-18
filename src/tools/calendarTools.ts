@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { toZonedTime, formatInTimeZone } from "date-fns-tz";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { fetchCalendarEvents, formatCalendarEvents, type CalendarEvent } from "../services/graphService.js";
+import { formatCalendarToolResponse } from "../utils/helper.js";
 
 // Define the expected shape of the tool arguments
 interface CalendarToolArgs {
@@ -50,12 +51,12 @@ function parseDateInput(dateStr: string, timezone: string): Date {
  * @param server The MCP server instance
  */
 export function registerCalendarTools(server: McpServer): void {
-  // Define the schema for the tool parameters
+  // Define the schema for the tool parameters with hardcoded defaults
   const paramsSchema = {
-    user_id: z.string().describe("Microsoft Graph user ID or 'me' for current user"),
-    start_date: z.string().describe("Start date in YYYY-MM-DD format"),
-    end_date: z.string().describe("End date in YYYY-MM-DD format"),
-    timezone: z.string().default("UTC").describe("IANA timezone (e.g., 'America/New_York')")
+    user_id: z.string().default("me").describe("Microsoft Graph user ID or 'me' for current user"),
+    start_date: z.string().default("2025-06-18").describe("Start date in YYYY-MM-DD format (default: 2025-06-18)"),
+    end_date: z.string().default("2025-06-19").describe("End date in YYYY-MM-DD format (default: 2025-06-19)"),
+    timezone: z.string().default("Asia/Manila").describe("IANA timezone (e.g., 'Asia/Manila')")
   };
 
   // Register the tool with the server
@@ -136,8 +137,13 @@ export function registerCalendarTools(server: McpServer): void {
             }
           ]
         };
-
-        return response;
+        const uri = response.content.find(c => c.type === 'resource')?.resource?.uri;
+        let eventsResponse: any;
+        if (uri) {
+          eventsResponse = formatCalendarToolResponse(uri);
+          return eventsResponse;
+        }
+        else return [];
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         return {
