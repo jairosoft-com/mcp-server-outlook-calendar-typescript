@@ -1,0 +1,154 @@
+import { z } from "zod";
+import { format } from "date-fns";
+import { toZonedTime, formatInTimeZone } from "date-fns-tz";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { fetchCalendarEvents, formatCalendarEvents, type CalendarEvent } from "../services/graphService.js";
+
+// Define the expected shape of the tool arguments
+interface CalendarToolArgs {
+  user_id: string;
+  start_date: string;
+  end_date: string;
+  timezone: string;
+  [key: string]: unknown; // Allow additional properties
+}
+
+// Define the content types for the MCP response
+type ContentItem = 
+  | { type: "text"; text: string }
+  | { type: "resource"; resource: { text: string; uri: string; mimeType?: string } };
+
+interface ToolResponse {
+  content: ContentItem[];
+  [key: string]: unknown; // Allow additional properties
+}
+
+/**
+ * Validates and parses date input from the user
+ * @param dateStr Date string in YYYY-MM-DD format
+ * @param timezone IANA timezone string
+ * @returns Date object in the specified timezone
+ */
+function parseDateInput(dateStr: string, timezone: string): Date {
+  try {
+    // Parse the input date (assumes YYYY-MM-DD format)
+    const [year, month, day] = dateStr.split('-').map(Number);
+    
+    // Create a date in the specified timezone
+    const localDate = new Date(Date.UTC(year, month - 1, day));
+    
+    // Convert to the target timezone
+    return toZonedTime(localDate, timezone);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`Invalid date format. Please use YYYY-MM-DD format. ${errorMessage}`);
+  }
+}
+
+/**
+ * Registers the calendar tools with the MCP server
+ * @param server The MCP server instance
+ */
+export function registerCalendarTools(server: McpServer): void {
+  // Define the schema for the tool parameters
+  const paramsSchema = {
+    user_id: z.string().describe("Microsoft Graph user ID or 'me' for current user"),
+    start_date: z.string().describe("Start date in YYYY-MM-DD format"),
+    end_date: z.string().describe("End date in YYYY-MM-DD format"),
+    timezone: z.string().default("UTC").describe("IANA timezone (e.g., 'America/New_York')")
+  };
+
+  // Register the tool with the server
+  server.tool(
+    "get-calendar-events",
+    "Fetch calendar events for a user within a date range",
+    paramsSchema,
+    async (args: unknown) => {
+      // Validate and parse the input arguments
+      const { user_id, start_date, end_date, timezone } = args as CalendarToolArgs;
+      try {
+        // Parse and validate dates
+        const startDate = parseDateInput(start_date, timezone);
+        const endDate = parseDateInput(end_date, timezone);
+        
+        // Add one day to end date to include the full day
+        endDate.setDate(endDate.getDate() + 1);
+        
+        // Fetch events from Microsoft Graph
+        const events = await fetchCalendarEvents(user_id, startDate, endDate);
+        const formattedEvents = formatCalendarEvents(events);
+        
+        // Format dates in the response to be more readable
+        const formatDate = (date: Date) => 
+          formatInTimeZone(date, timezone, 'yyyy-MM-dd HH:mm:ss zzz');
+        
+        // Format events for human-readable display
+        const formatEventTime = (dateStr: string) => {
+          const date = new Date(dateStr);
+          return formatInTimeZone(date, timezone, 'MMM d, yyyy h:mm a');
+        };
+
+        // Create a human-readable summary of events
+        let eventsSummary = `📅 Found ${formattedEvents.length} events between ${start_date} and ${end_date}\n\n`;
+        
+        if (formattedEvents.length > 0) {
+          eventsSummary += (formattedEvents as unknown as CalendarEvent[]).map((event, index) => {
+            const startTime = formatEventTime(event.start.dateTime);
+            const endTime = formatEventTime(event.end.dateTime);
+            const organizerName = event.organizer?.emailAddress?.name || 'No organizer';
+            const attendeeCount = event.attendees?.length || 0;
+            
+            return `${index + 1}. ${event.subject || 'No Subject'}\n` +
+                   `   📅 ${startTime} - ${endTime}\n` +
+                   `   👤 ${organizerName}\n` +
+                   (attendeeCount > 0 ? `   👥 ${attendeeCount} attendee${attendeeCount > 1 ? 's' : ''}\n` : '') +
+                   (event.bodyPreview ? `   📝 ${event.bodyPreview.substring(0, 100)}${event.bodyPreview.length > 100 ? '...' : ''}\n` : '') +
+                   (event.webLink ? `   🔗 ${event.webLink}\n` : '');
+          }).join('\n');
+        } else {
+          eventsSummary += 'No events found in the specified date range.';
+        }
+
+        // Prepare the detailed response data
+        const responseData = {
+          count: formattedEvents.length,
+          events: formattedEvents.map(event => ({
+            ...event,
+            start: formatDate(new Date(event.start.dateTime)),
+            end: formatDate(new Date(event.end.dateTime))
+          }))
+        };
+
+        // Create response with both human-readable and structured data
+        const response: ToolResponse = {
+          content: [
+            {
+              type: "text",
+              text: eventsSummary
+            },
+            {
+              type: "resource",
+              resource: {
+                text: "Detailed Calendar Events",
+                uri: `data:application/json,${encodeURIComponent(JSON.stringify(responseData))}`,
+                mimeType: "application/json"
+              }
+            }
+          ]
+        };
+
+        return response;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error: ${errorMessage}`
+            }
+          ]
+        };
+      }
+    }
+  );
+}

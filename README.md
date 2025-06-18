@@ -1,20 +1,65 @@
-# MCP Weather Server
+# MCP Server with Weather and Calendar Integration
 
-A Model Context Protocol (MCP) server implementation for weather data, built with TypeScript and Node.js. This server provides weather alerts and forecasts through the MCP protocol.
+A Model Context Protocol (MCP) server implementation with weather data and Microsoft Calendar integration, built with TypeScript and Node.js. This server provides weather alerts, forecasts, and calendar event management through the MCP protocol.
 
 ## Features
 
-- MCP protocol implementation for weather operations
-- Get weather alerts by US state code
-- Get weather forecasts by coordinates
-- TypeScript support with type safety
-- Easy setup and configuration
+- **Weather Operations**
+  - Get weather alerts by US state code
+  - Get weather forecasts by coordinates
+
+- **Calendar Integration**
+  - Fetch calendar events from Microsoft 365/Outlook
+  - Filter events by date range
+  - Timezone support for event times
+
+- **Developer Experience**
+  - TypeScript support with type safety
+  - Environment-based configuration
+  - Comprehensive error handling
+  - Easy setup and configuration
 
 ## Prerequisites
 
 - Node.js 16.x or later
 - npm 7.x or later
 - TypeScript 4.9.x or later
+
+## Microsoft Calendar Integration
+
+This server includes integration with Microsoft 365/Outlook Calendar using Microsoft Graph API. Follow these steps to set it up:
+
+### Prerequisites
+
+1. **Azure AD App Registration**
+   - Go to the [Azure Portal](https://portal.azure.com/)
+   - Navigate to Azure Active Directory > App registrations > New registration
+   - Register a new application with a name (e.g., "MCP Calendar Integration")
+   - Note down the Application (client) ID and Directory (tenant) ID
+
+2. **Configure API Permissions**
+   - Under your app registration, go to API permissions
+   - Add the following Microsoft Graph API permissions:
+     - `Calendars.Read`
+     - `Calendars.Read.Shared`
+     - `User.Read`
+   - Grant admin consent for these permissions
+
+3. **Create a Client Secret**
+   - In your app registration, go to Certificates & secrets
+   - Create a new client secret
+   - Note down the secret value (it will only be shown once)
+
+### Configuration
+
+Update your `.env` file with the Azure AD credentials:
+
+```env
+# Microsoft Graph API
+AZURE_TENANT_ID=your-tenant-id
+AZURE_CLIENT_ID=your-client-id
+AZURE_CLIENT_SECRET=your-client-secret
+```
 
 ## Getting Started
 
@@ -41,13 +86,66 @@ A Model Context Protocol (MCP) server implementation for weather data, built wit
 Create a `.env` file in the root directory with the following environment variables:
 
 ```env
-# Optional: Set to true to enable debug logging
+# Weather Service
 DEBUG=false
-# User agent for NWS API requests
 USER_AGENT=weather-app/1.0
+
+# Microsoft Graph API (Calendar)
+AZURE_TENANT_ID=your-tenant-id
+AZURE_CLIENT_ID=your-client-id
+AZURE_CLIENT_SECRET=your-client-secret
+
+# Optional: Set timezone for calendar events (default: UTC)
+TZ=UTC
 ```
 
-### Running the Server
+### Using the Calendar Tool
+
+Once the server is running, you can use the following MCP tool to interact with Microsoft Calendar:
+
+### Get Calendar Events
+
+**Tool Name:** `get-calendar-events`
+
+**Description:** Fetch calendar events for a user within a specified date range.
+
+**Parameters:**
+- `user_id` (string): Microsoft Graph user ID or 'me' for current user
+- `start_date` (string): Start date in YYYY-MM-DD format
+- `end_date` (string): End date in YYYY-MM-DD format
+- `timezone` (string, optional): IANA timezone (e.g., 'America/New_York'). Default: 'UTC'
+
+**Example Request:**
+```json
+{
+  "user_id": "me",
+  "start_date": "2025-06-18",
+  "end_date": "2025-06-19",
+  "timezone": "Asia/Manila"
+}
+```
+
+**Example Response:**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Found 3 events between 2025-06-18 and 2025-06-19"
+    },
+    {
+      "type": "resource",
+      "resource": {
+        "text": "Calendar Events",
+        "uri": "data:application/json,...",
+        "mimeType": "application/json"
+      }
+    }
+  ]
+}
+```
+
+## Running the Server
 
 ### Development Mode
 Start the server with auto-reload:
