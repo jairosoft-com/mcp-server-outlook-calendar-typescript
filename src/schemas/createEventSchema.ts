@@ -27,10 +27,20 @@ const getDefaultStartTime = () => {
   return now;
 };
 
-// Helper to format date to YYYY-MM-DD-HH:MM:SS
-const formatDateTime = (date: Date): string => {
+// Helper to format date to YYYY-MM-DDTHH:MM:SS
+const formatLocalDateTime = (date: Date): string => {
   const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}-${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
+};
+
+// Helper to get the local timezone offset in +HH:MM format
+const getLocalTimezoneOffset = (): string => {
+  const tzOffset = -new Date().getTimezoneOffset();
+  const sign = tzOffset >= 0 ? '+' : '-';
+  const absOffset = Math.abs(tzOffset);
+  const hours = Math.floor(absOffset / 60);
+  const minutes = absOffset % 60;
+  return `${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 };
 
 // Recurrence schema that can be used independently
@@ -89,19 +99,17 @@ const baseEventSchema = z.object({
     
   start_datetime: z.string()
     .min(1, 'Start date and time is required')
-    .default(() => formatDateTime(getDefaultStartTime()))
-    .transform(parseCustomDateTime)
-    .describe('The start date and time in YYYY-MM-DD-HH:MM:SS format. Example: 2025-06-20-14:00:00 for 2:00 PM'),
+    .default(() => formatLocalDateTime(getDefaultStartTime()))
+    .describe('The start date and time in YYYY-MM-DDTHH:MM:SS format. Example: 2025-06-20T14:00:00 for 2:00 PM'),
     
   end_datetime: z.string()
     .min(1, 'End date and time is required')
-    .default(() => formatDateTime((() => {
-      const start = getDefaultStartTime();
-      start.setHours(start.getHours() + 1);
-      return start;
-    })()))
-    .transform(parseCustomDateTime)
-    .describe('The end date and time in YYYY-MM-DD-HH:MM:SS format. Example: 2025-06-20-15:00:00 for 3:00 PM'),
+    .default(() => {
+      const end = getDefaultStartTime();
+      end.setHours(end.getHours() + 1);
+      return formatLocalDateTime(end);
+    })
+    .describe('The end date and time in YYYY-MM-DDTHH:MM:SS format. Example: 2025-06-20T15:00:00 for 3:00 PM'),
     
   is_online_meeting: z.boolean()
     .default(true)
@@ -130,6 +138,11 @@ const recurrenceFieldsSchema = z.object({
     .default('daily')
     .describe('How often the event should repeat. Example: daily, weekly, monthly')
     .optional(),
+    
+  days_of_week: z.array(z.enum(['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']))
+    .default(['monday', 'wednesday', 'friday'])
+    .optional()
+    .describe('Days of the week for weekly recurrence. Example: ["monday", "wednesday", "friday"]'),
   
   recurrence_interval: z.number()
     .int()
@@ -155,86 +168,94 @@ const recurrenceFieldsSchema = z.object({
     .describe('Number of times the event should occur. Required if range_type is "numbered"')
 }).partial();
 
-// Create the final schema with conditional recurrence fields
-const createEventSchema = baseEventSchema.merge(recurrenceFieldsSchema)
-  .refine(
-    (data) => {
-      if (!data.is_recurring) return true;
-      
-      // Check required fields based on range_type
-      if (data.recurrence_range_type === 'endDate') {
-        return !!data.recurrence_end_date;
-      } else if (data.recurrence_range_type === 'numbered') {
-        return data.recurrence_occurrences !== undefined;
-      }
-      return true;
-    },
-    {
-      message: 'Recurrence end date is required when range type is "endDate" and number of occurrences is required when range type is "numbered"',
-      path: ['recurrence']
-    }
-  )
-  .transform((data) => {
-    // Transform the flat structure into the nested structure expected by the API
-    if (!data.is_recurring) {
-      const { 
-        is_recurring, 
-        recurrence_type, 
-        recurrence_interval, 
-        recurrence_range_type, 
-        recurrence_end_date, 
-        recurrence_occurrences, 
-        ...rest 
-      } = data as any;
-      return rest;
-    }
-    
-    // Only include recurrence if it's enabled
-    const recurrence = {
-      type: (data as any).recurrence_type || 'daily',
-      interval: (data as any).recurrence_interval || 1,
-      range_type: (data as any).recurrence_range_type || 'endDate',
-      ...((data as any).recurrence_range_type === 'endDate' && (data as any).recurrence_end_date && { 
-        end_date: (data as any).recurrence_end_date 
-      }),
-      ...((data as any).recurrence_range_type === 'numbered' && (data as any).recurrence_occurrences && { 
-        number_of_occurrences: (data as any).recurrence_occurrences 
-      })
-    };
-    
-    const { 
-      is_recurring, 
-      recurrence_type, 
-      recurrence_interval, 
-      recurrence_range_type, 
-      recurrence_end_date, 
-      recurrence_occurrences, 
-      ...rest 
-    } = data as any;
-    
-    return {
-      ...rest,
-      recurrence
-    };
-  });
-
 // Export the schema in the format expected by the tool registration
 export const createEventToolSchema = {
-  user_id: z.string().default("me").describe("Microsoft Graph user ID or 'me' to use USER_ID from .env"),
-  subject: z.string().min(1, 'Subject is required').describe("The subject of the event"),
-  content: z.string().default('').describe("The content/description of the event"),
-  start_datetime: z.string().describe("Start date and time in ISO format"),
-  end_datetime: z.string().describe("End date and time in ISO format"),
-  is_online_meeting: z.boolean().default(false).describe("Whether this is an online meeting"),
-  attendees: z.array(z.string()).default([]).describe("Array of attendee email addresses"),
-  location: z.string().default('').describe("The location of the event"),
-  importance: z.enum(['Low', 'Normal', 'High']).default('Normal').describe("The importance of the event"),
-  is_recurring: z.boolean().default(false).describe("Whether this is a recurring event"),
-  recurrence_type: z.enum(['daily', 'weekly', 'monthly', 'yearly', 'absoluteMonthly', 'relativeMonthly', 'absoluteYearly', 'relativeYearly']).optional().describe("The type of recurrence"),
-  recurrence_interval: z.number().int().positive().optional().describe("The interval between occurrences"),
-  recurrence_range_type: z.enum(['endDate', 'noEnd', 'numbered']).optional().describe("The type of recurrence range"),
-  recurrence_end_date: z.string().optional().describe("The end date for the recurrence"),
-  recurrence_occurrences: z.number().int().positive().optional().describe("The number of occurrences for numbered recurrence")
+  user_id: z.string()
+    .default("me")
+    .describe("Microsoft Graph user ID or 'me' to use USER_ID from .env. Example: me"),
+    
+  subject: z.string()
+    .min(1, 'Subject is required')
+    .default("Team Sync Meeting")
+    .describe("The subject of the event. Example: Team Sync Meeting"),
+    
+  content: z.string()
+    .default('<p>This is a scheduled team meeting. Please join on time with your updates and questions.</p>')
+    .describe('The content/description of the event. Example: <p>Weekly team sync to discuss project updates and blockers.</p>'),
+    
+  timezone: z.string()
+    .default(Intl.DateTimeFormat().resolvedOptions().timeZone)
+    .describe('The timezone for the event. Example: America/New_York'),
+    
+  start_datetime: z.string()
+    .default(() => formatLocalDateTime(getDefaultStartTime()))
+    .describe('The start date and time in YYYY-MM-DDTHH:MM:SS format. Example: 2025-06-20T14:00:00 for 2:00 PM'),
+    
+  end_datetime: z.string()
+    .default(() => {
+      const end = getDefaultStartTime();
+      end.setHours(end.getHours() + 1);
+      return formatLocalDateTime(end);
+    })
+    .describe('The end date and time in YYYY-MM-DDTHH:MM:SS format. Example: 2025-06-20T15:00:00 for 3:00 PM'),
+    
+  is_online_meeting: z.boolean()
+    .default(true)
+    .describe("Whether this is an online meeting. Example: true"),
+    
+  attendees: z.array(z.string())
+    .default(["team@example.com"])
+    .describe("Array of attendee email addresses. Example: [\"user1@example.com\", \"user2@example.com\"]"),
+    
+  location: z.string()
+    .default('Microsoft Teams Meeting')
+    .describe("The location of the event. Example: Conference Room A or Microsoft Teams"),
+    
+  importance: z.enum(['Low', 'Normal', 'High'])
+    .default('Normal')
+    .describe("The importance of the event. Must be one of: Low, Normal, High"),
+    
+  is_recurring: z.boolean()
+    .default(false)
+    .describe("Whether this is a recurring event. Example: true for weekly team meetings"),
+    
+  recurrence_type: z.enum(['daily', 'weekly', 'monthly', 'yearly', 'absoluteMonthly', 'relativeMonthly', 'absoluteYearly', 'relativeYearly'])
+    .default('weekly')
+    .optional()
+    .describe("The type of recurrence. Example: 'weekly' for weekly meetings"),
+    
+  days_of_week: z.array(z.enum(['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']))
+    .default(['monday', 'wednesday', 'friday'])
+    .optional()
+    .describe('Days of the week for weekly recurrence. Example: ["monday", "wednesday", "friday"]'),
+    
+  recurrence_interval: z.number()
+    .int()
+    .positive()
+    .default(1)
+    .optional()
+    .describe("The interval between occurrences. Example: 2 for every other week/month"),
+    
+  recurrence_range_type: z.enum(['endDate', 'noEnd', 'numbered'])
+    .default('endDate')
+    .optional()
+    .describe('When should the recurrence end? "endDate" for a specific end date, "numbered" for a number of occurrences, or "noEnd" to repeat indefinitely'),
+    
+  recurrence_end_date: z.string()
+    .default(() => {
+      const date = new Date();
+      date.setMonth(date.getMonth() + 3); // Default to 3 months from now
+      return date.toISOString().split('T')[0];
+    })
+    .optional()
+    .describe("The end date for the recurrence (YYYY-MM-DD format). Example: 2025-12-31"),
+    
+  recurrence_occurrences: z.number()
+    .int()
+    .positive()
+    .default(10)
+    .optional()
+    .describe("The number of occurrences for numbered recurrence. Example: 10 for 10 total occurrences")
 };
 
 // Export the recurrence schema separately in case it's needed elsewhere

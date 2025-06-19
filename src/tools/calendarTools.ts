@@ -200,13 +200,19 @@ export function registerCalendarTools(server: McpServer): void {
         
         // If this is a recurring event, add the recurrence details
         if (is_recurring) {
-          eventData.recurrence = {
+          const recurrence: any = {
             type: recurrence_type,
             interval: recurrence_interval,
             range_type: recurrence_range_type,
             ...(recurrence_range_type === 'endDate' && recurrence_end_date && { end_date: recurrence_end_date }),
             ...(recurrence_range_type === 'numbered' && recurrence_occurrences && { number_of_occurrences: recurrence_occurrences })
           };
+          eventData.recurrence = recurrence;
+        }
+        
+        // Add days_of_week to the main event data if it exists
+        if (args.days_of_week?.length) {
+          eventData.days_of_week = args.days_of_week;
         }
         
         if (user_id === 'me') {
@@ -246,12 +252,13 @@ export function registerCalendarTools(server: McpServer): void {
         const event = await createCalendarEvent(user_id, cleanEventData);
         
         // Helper function to format date in the event's timezone
-        const formatEventDate = (dateTimeStr?: string, timeZone: string = eventData.timeZone) => {
+        const formatEventDate = (dateTimeStr?: string, timeZone: string = eventData.timezone) => {
           if (!dateTimeStr) return 'Time not specified';
           try {
             const date = new Date(dateTimeStr);
             if (isNaN(date.getTime())) return 'Invalid date';
-            return formatInTimeZoneNoOffset(date, timeZone, "MMM d, yyyy h:mm a");
+            // Format as YYYY-MM-DDTHH:MM:SS to match input format
+            return formatInTimeZoneNoOffset(date, timeZone, "yyyy-MM-dd'T'HH:mm:ss");
           } catch (error) {
             return 'Invalid date';
           }

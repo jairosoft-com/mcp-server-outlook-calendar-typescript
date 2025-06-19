@@ -220,6 +220,7 @@ export interface CreateEventRequestExtended extends Omit<CreateEventRequest, 'st
   start_datetime: string;
   end_datetime: string;
   is_online_meeting?: boolean;
+  days_of_week?: string[];
   recurrence?: {
     type: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'absoluteMonthly' | 'relativeMonthly' | 'absoluteYearly' | 'relativeYearly';
     interval: number;
@@ -234,6 +235,7 @@ export interface CreateEventRequestExtended extends Omit<CreateEventRequest, 'st
     content: string;
     contentType?: 'text' | 'html';
   };
+  [key: string]: any; // For any additional properties
 }
 
 export async function createCalendarEvent(
@@ -303,6 +305,14 @@ export async function createCalendarEvent(
         type: type as any,
         interval: interval || 1
       };
+      
+      // Handle days of week for weekly recurrence
+      if (type === 'weekly' && (eventData as any).days_of_week?.length) {
+        // Capitalize first letter of each day to match Microsoft Graph API requirements
+        pattern.daysOfWeek = (eventData as any).days_of_week.map((day: string) => 
+          day.charAt(0).toUpperCase() + day.slice(1).toLowerCase()
+        );
+      }
 
       const range: RecurrenceRange = {
         type: range_type,
