@@ -1,4 +1,4 @@
-import {formatInTimeZone } from "date-fns-tz";
+import { formatInTimeZone, toZonedTime, format } from "date-fns-tz";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { 
   fetchCalendarEvents, 
@@ -12,6 +12,12 @@ import { createEventSchema } from "../schemas/createEventSchema.js";
 import { fetchCalendarEventsSchema } from "../schemas/fetchCalendarEventsSchema.js";
 import { parseDateInput } from "../utils/helpers.js";
 dotenv.config();
+
+// Helper function to format date in a specific timezone without timezone offset
+const formatInTimeZoneNoOffset = (date: Date | string, timeZone: string, formatStr: string) => {
+  const zonedDate = toZonedTime(date, timeZone);
+  return format(zonedDate, formatStr, { timeZone });
+};
 
 /**
  * Validates and parses date input from the user
@@ -177,7 +183,7 @@ export function registerCalendarTools(server: McpServer): void {
   server.tool(
     'create-calendar-event',
     'Create a new calendar event with the specified parameters',
-    createEventSchema,
+    createEventSchema.shape,
     async (args: any) => {
       try {
         // Handle user_id from .env if 'me' is specified
@@ -200,15 +206,19 @@ export function registerCalendarTools(server: McpServer): void {
           ? attendees.split(',').map((email: string) => email.trim())
           : [];
 
+        // The dates are already in the correct format from the schema
+        const startDateTimeStr = eventData.startDateTime;
+        const endDateTimeStr = eventData.endDateTime;
+
         // Prepare the event data for the API
         const cleanEventData: CreateEventRequest = {
           subject: eventData.subject,
           start: {
-            dateTime: eventData.startDateTime,
+            dateTime: startDateTimeStr,
             timeZone: eventData.timeZone
           },
           end: {
-            dateTime: eventData.endDateTime,
+            dateTime: endDateTimeStr,
             timeZone: eventData.timeZone
           },
           ...(eventData.location && { 
@@ -237,12 +247,13 @@ export function registerCalendarTools(server: McpServer): void {
         // Create the event using the Graph API
         const event = await createCalendarEvent(user_id, cleanEventData as CreateEventRequest) as any;
         
-        // Helper function to safely format date
-        const formatEventDate = (dateTimeStr?: string) => {
+        // Helper function to format date in the event's timezone
+        const formatEventDate = (dateTimeStr?: string, timeZone: string = eventData.timeZone) => {
           if (!dateTimeStr) return 'Time not specified';
           try {
             const date = new Date(dateTimeStr);
-            return isNaN(date.getTime()) ? 'Invalid date' : date.toLocaleString();
+            if (isNaN(date.getTime())) return 'Invalid date';
+            return formatInTimeZoneNoOffset(date, timeZone, "MMM d, yyyy h:mm a");
           } catch (error) {
             return 'Invalid date';
           }
@@ -253,7 +264,7 @@ export function registerCalendarTools(server: McpServer): void {
           "✅ Event created successfully!",
           "",
           `📅 ${event.subject || 'No subject'}`,
-          `🕒 ${formatEventDate(event.start?.dateTime)} - ${formatEventDate(event.end?.dateTime)}`,
+          `🕒 ${formatEventDate(event.start?.dateTime, event.start?.timeZone)} - ${formatEventDate(event.end?.dateTime, event.end?.timeZone)}`,
           ...(event.location?.displayName ? [`📍 ${event.location.displayName}`] : []),
           ...(event.onlineMeeting?.joinUrl ? [`🔗 Join: ${event.onlineMeeting.joinUrl}`] : []),
           ...(attendeeList.length > 0 ? ["", "👥 Attendees:", ...attendeeList.map((email: string) => `   • ${email}`)] : [])
