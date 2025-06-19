@@ -198,22 +198,36 @@ export function registerCalendarTools(server: McpServer): void {
           ...eventData 
         } = args;
         
+        // Initialize event data with days_of_week if provided
+        const eventDataWithRecurrence = {
+          ...eventData,
+          // Add days_of_week to the main event data if it exists
+          ...(args.days_of_week?.length && { days_of_week: args.days_of_week })
+        };
+        
         // If this is a recurring event, add the recurrence details
         if (is_recurring) {
           const recurrence: any = {
             type: recurrence_type,
-            interval: recurrence_interval,
+            interval: recurrence_interval || 1,  // Ensure interval is at least 1
             range_type: recurrence_range_type,
             ...(recurrence_range_type === 'endDate' && recurrence_end_date && { end_date: recurrence_end_date }),
             ...(recurrence_range_type === 'numbered' && recurrence_occurrences && { number_of_occurrences: recurrence_occurrences })
           };
-          eventData.recurrence = recurrence;
+          
+          // For weekly events, ensure days_of_week is included in the recurrence pattern
+          if (recurrence_type === 'weekly') {
+            if (args.days_of_week?.length) {
+              recurrence.days_of_week = args.days_of_week;
+              eventDataWithRecurrence.days_of_week = args.days_of_week;
+            }
+          }
+          
+          eventDataWithRecurrence.recurrence = recurrence;
         }
         
-        // Add days_of_week to the main event data if it exists
-        if (args.days_of_week?.length) {
-          eventData.days_of_week = args.days_of_week;
-        }
+        // Use the event data with recurrence for the rest of the function
+        const finalEventData = eventDataWithRecurrence;
         
         if (user_id === 'me') {
           if (!process.env.USER_ID) {
@@ -228,25 +242,28 @@ export function registerCalendarTools(server: McpServer): void {
         }
 
         // Process attendees if provided (handle both string and array formats)
-        const attendeeList = Array.isArray(eventData.attendees) 
-          ? eventData.attendees.filter((email: any) => typeof email === 'string' && email.includes('@'))
+        const attendeeList = Array.isArray(finalEventData.attendees) 
+          ? finalEventData.attendees.filter((email: any) => typeof email === 'string' && email.includes('@'))
           : [];
 
         // Prepare the event data for the API
         const cleanEventData = {
-          subject: eventData.subject,
-          start_datetime: eventData.start_datetime,
-          end_datetime: eventData.end_datetime,
-          is_online_meeting: eventData.is_online_meeting,
-          location: eventData.location,
-          importance: eventData.importance,
+          subject: finalEventData.subject,
+          start_datetime: finalEventData.start_datetime,
+          end_datetime: finalEventData.end_datetime,
+          is_online_meeting: finalEventData.is_online_meeting,
+          location: finalEventData.location,
+          importance: finalEventData.importance,
           body: {
-            content: eventData.content,
+            content: finalEventData.content,
             contentType: 'html'
           },
           ...(attendeeList.length > 0 && { attendees: attendeeList }),
-          ...(eventData.recurrence && { recurrence: eventData.recurrence })
+          ...(finalEventData.days_of_week && { days_of_week: finalEventData.days_of_week }),
+          ...(finalEventData.recurrence && { recurrence: finalEventData.recurrence })
         };
+        
+        console.error('Creating event with data:', JSON.stringify(cleanEventData, null, 2));
 
         // Create the event using the Graph API
         const event = await createCalendarEvent(user_id, cleanEventData);

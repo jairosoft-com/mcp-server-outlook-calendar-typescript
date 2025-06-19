@@ -307,11 +307,18 @@ export async function createCalendarEvent(
       };
       
       // Handle days of week for weekly recurrence
-      if (type === 'weekly' && (eventData as any).days_of_week?.length) {
-        // Capitalize first letter of each day to match Microsoft Graph API requirements
-        pattern.daysOfWeek = (eventData as any).days_of_week.map((day: string) => 
-          day.charAt(0).toUpperCase() + day.slice(1).toLowerCase()
-        );
+      if (type === 'weekly') {
+        if (eventData.days_of_week?.length) {
+          // Capitalize first letter of each day to match Microsoft Graph API requirements
+          pattern.daysOfWeek = eventData.days_of_week.map((day: string) => 
+            day.charAt(0).toUpperCase() + day.slice(1).toLowerCase()
+          );
+        } else {
+          // If no days specified, default to the day of the start date
+          const startDate = new Date(eventData.start_datetime);
+          const dayOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][startDate.getDay()];
+          pattern.daysOfWeek = [dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1)];
+        }
       }
 
       const range: RecurrenceRange = {
@@ -326,11 +333,23 @@ export async function createCalendarEvent(
         range.numberOfOccurrences = number_of_occurrences;
       }
 
+      // Log the pattern for debugging
+      console.error('Recurrence pattern:', {
+        type: pattern.type,
+        interval: pattern.interval,
+        daysOfWeek: pattern.daysOfWeek,
+        dayOfMonth: pattern.dayOfMonth,
+        month: pattern.month,
+        firstDayOfWeek: pattern.firstDayOfWeek,
+        index: pattern.index
+      });
+
       // Convert to PatternedRecurrence format expected by Microsoft Graph
       eventPayload.recurrence = {
         pattern: {
           type: pattern.type,
           interval: pattern.interval,
+          // Include daysOfWeek for weekly patterns
           ...(pattern.daysOfWeek && { daysOfWeek: pattern.daysOfWeek }),
           ...(pattern.dayOfMonth && { dayOfMonth: pattern.dayOfMonth }),
           ...(pattern.month && { month: pattern.month }),
@@ -345,6 +364,9 @@ export async function createCalendarEvent(
           recurrenceTimeZone: range.recurrenceTimeZone
         }
       } as PatternedRecurrence;
+
+      // Log the full event payload for debugging
+      console.error('Sending event payload to Microsoft Graph:', JSON.stringify(eventPayload, null, 2));
     }
 
     // Create the event using Microsoft Graph API
