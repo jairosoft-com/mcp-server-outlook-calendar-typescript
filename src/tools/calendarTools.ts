@@ -1,13 +1,17 @@
-import { z } from "zod";
-import { toZonedTime, formatInTimeZone } from "date-fns-tz";
+import {formatInTimeZone } from "date-fns-tz";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { fetchCalendarEvents, formatCalendarEvents, createCalendarEvent, type CalendarEvent, CreateEventRequest } from "../services/graphService.js";
-
-// Load environment variables
+import { 
+  fetchCalendarEvents, 
+  formatCalendarEvents, 
+  createCalendarEvent, 
+  CreateEventRequest } from "../services/calendarEventsService.js";
 import dotenv from 'dotenv';
 import ToolResponse from "../interfaces/getCalendarResponse.js";
-dotenv.config();
 import CalendarToolArgs from "../interfaces/calendarArgs.js";
+import { createEventSchema } from "../schemas/createEventSchema.js";
+import { fetchCalendarEventsSchema } from "../schemas/fetchCalendarEventsSchema.js";
+import { parseDateInput } from "../utils/helpers.js";
+dotenv.config();
 
 /**
  * Validates and parses date input from the user
@@ -15,46 +19,24 @@ import CalendarToolArgs from "../interfaces/calendarArgs.js";
  * @param timezone IANA timezone string
  * @returns Date object in the specified timezone
  */
-function parseDateInput(dateStr: string, timezone: string): Date {
-  try {
-    // Parse the input date (assumes YYYY-MM-DD format)
-    const [year, month, day] = dateStr.split('-').map(Number);
-    
-    // Create a date in the specified timezone
-    const localDate = new Date(Date.UTC(year, month - 1, day));
-    
-    // Convert to the target timezone
-    return toZonedTime(localDate, timezone);
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    throw new Error(`Invalid date format. Please use YYYY-MM-DD format. ${errorMessage}`);
-  }
-}
 
 /**
  * Registers the calendar tools with the MCP server
  * @param server The MCP server instance
  */
+
 export function registerCalendarTools(server: McpServer): void {
-  // Define the schema for the tool parameters with defaults
   const now = new Date();
   const today = now.toISOString().split('T')[0];
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
-  const paramsSchema = {
-    user_id: z.string().default("me").describe("Microsoft Graph user ID or 'me' to use USER_ID from .env"),
-    start_date: z.string().default(today).describe("Start date in YYYY-MM-DD format (default: today)"),
-    end_date: z.string().default(tomorrowStr).describe("End date in YYYY-MM-DD format (default: tomorrow)"),
-    timezone: z.string().default("Asia/Manila").describe("IANA timezone (default: Asia/Manila)")
-  };
-
-  // Register the tool with the server
+  // Register the Get Calendar Events tool with the server
   server.tool(
     "get-calendar-events",
     "Fetch calendar events for a user within a date range",
-    paramsSchema,
+    fetchCalendarEventsSchema,
     async (args: unknown) => {
       // Get parameters with defaults
       let { 
@@ -191,50 +173,7 @@ export function registerCalendarTools(server: McpServer): void {
     }
   );
 
-  // Define the schema for create-calendar-event with simplified JSON input and placeholders
-  const createEventSchema = {
-    user_id: z.string()
-      .default("me")
-      .describe("Microsoft Graph user ID or 'me' to use USER_ID from .env"),
-    
-    subject: z.string()
-      .default("Team Sync Meeting")
-      .describe("Enter the event subject (e.g., 'Team Meeting')"),
-    
-    startDateTime: z.string()
-      .default(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString())
-      .describe("Start time in ISO format (e.g., 2025-06-20T14:00:00)"),
-    
-    endDateTime: z.string()
-      .default(new Date(Date.now() + 25 * 60 * 60 * 1000).toISOString())
-      .describe("End time in ISO format (e.g., 2025-06-20T15:00:00)"),
-    
-    timeZone: z.string()
-      .default("Asia/Manila")
-      .describe("IANA timezone (e.g., 'Asia/Manila', 'America/New_York')"),
-    
-    location: z.string()
-      .default("Virtual Meeting")
-      .describe("Location (e.g., 'Conference Room 1' or 'Zoom Meeting')"),
-    
-    body: z.string()
-      .default("This is a test event created from the MCP server.")
-      .describe("Event description or agenda"),
-    
-    isOnlineMeeting: z.boolean()
-      .default(true)
-      .describe("Create an online meeting (true/false)"),
-    
-    isReminderOn: z.boolean()
-      .default(true)
-      .describe("Enable reminder (true/false)"),
-    
-    attendees: z.string()
-      .default("")
-      .describe("Comma-separated list of attendee emails (e.g., 'user1@example.com,user2@example.com')")
-  };
-
-    // Register the create-calendar-event tool with schema
+  // Register the create-calendar-event tool
   server.tool(
     'create-calendar-event',
     'Create a new calendar event with the specified parameters',
