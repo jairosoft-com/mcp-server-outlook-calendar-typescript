@@ -8,7 +8,7 @@ import {
 import dotenv from 'dotenv';
 import ToolResponse from "../interfaces/getCalendarResponse.js";
 import CalendarToolArgs from "../interfaces/calendarArgs.js";
-import { createEventSchema } from "../schemas/createEventSchema.js";
+import { createEventToolSchema } from "../schemas/createEventSchema.js";
 import { fetchCalendarEventsSchema } from "../schemas/fetchCalendarEventsSchema.js";
 import { parseDateInput } from "../utils/helpers.js";
 dotenv.config();
@@ -183,11 +183,31 @@ export function registerCalendarTools(server: McpServer): void {
   server.tool(
     'create-calendar-event',
     'Create a new calendar event with the specified parameters',
-    createEventSchema.shape,
+    createEventToolSchema,
     async (args: any) => {
       try {
         // Handle user_id from .env if 'me' is specified
-        let { user_id, attendees, ...eventData } = args;
+        let { 
+          user_id, 
+          is_recurring, 
+          recurrence_type, 
+          recurrence_interval, 
+          recurrence_range_type, 
+          recurrence_end_date, 
+          recurrence_occurrences,
+          ...eventData 
+        } = args;
+        
+        // If this is a recurring event, add the recurrence details
+        if (is_recurring) {
+          eventData.recurrence = {
+            type: recurrence_type,
+            interval: recurrence_interval,
+            range_type: recurrence_range_type,
+            ...(recurrence_range_type === 'endDate' && recurrence_end_date && { end_date: recurrence_end_date }),
+            ...(recurrence_range_type === 'numbered' && recurrence_occurrences && { number_of_occurrences: recurrence_occurrences })
+          };
+        }
         
         if (user_id === 'me') {
           if (!process.env.USER_ID) {
@@ -201,51 +221,29 @@ export function registerCalendarTools(server: McpServer): void {
           user_id = process.env.USER_ID;
         }
 
-        // Process attendees if provided
-        const attendeeList = typeof attendees === 'string' && attendees.trim() 
-          ? attendees.split(',').map((email: string) => email.trim())
+        // Process attendees if provided (handle both string and array formats)
+        const attendeeList = Array.isArray(eventData.attendees) 
+          ? eventData.attendees.filter((email: any) => typeof email === 'string' && email.includes('@'))
           : [];
 
-        // The dates are already in the correct format from the schema
-        const startDateTimeStr = eventData.startDateTime;
-        const endDateTimeStr = eventData.endDateTime;
-
         // Prepare the event data for the API
-        const cleanEventData: CreateEventRequest = {
+        const cleanEventData = {
           subject: eventData.subject,
-          start: {
-            dateTime: startDateTimeStr,
-            timeZone: eventData.timeZone
-          },
-          end: {
-            dateTime: endDateTimeStr,
-            timeZone: eventData.timeZone
-          },
-          ...(eventData.location && { 
-            location: { 
-              displayName: eventData.location,
-              locationType: 'default'
-            } 
-          }),
+          start_datetime: eventData.start_datetime,
+          end_datetime: eventData.end_datetime,
+          is_online_meeting: eventData.is_online_meeting,
+          location: eventData.location,
+          importance: eventData.importance,
           body: {
-            contentType: 'text',
-            content: eventData.body || ''
+            content: eventData.content,
+            contentType: 'html'
           },
-          isOnlineMeeting: eventData.isOnlineMeeting,
-          isReminderOn: eventData.isReminderOn === 'true',
-          ...(attendeeList.length > 0 && {
-            attendees: attendeeList.map((email: string) => ({
-              emailAddress: { 
-                address: email,
-                name: email.split('@')[0]
-              },
-              type: "required" as const
-            }))
-          })
+          ...(attendeeList.length > 0 && { attendees: attendeeList }),
+          ...(eventData.recurrence && { recurrence: eventData.recurrence })
         };
 
         // Create the event using the Graph API
-        const event = await createCalendarEvent(user_id, cleanEventData as CreateEventRequest) as any;
+        const event = await createCalendarEvent(user_id, cleanEventData);
         
         // Helper function to format date in the event's timezone
         const formatEventDate = (dateTimeStr?: string, timeZone: string = eventData.timeZone) => {
@@ -260,14 +258,31 @@ export function registerCalendarTools(server: McpServer): void {
         };
 
         // Format the response
+        const formatAttendees = (attendees: any[] = []) => {
+          return attendees.map(attendee => {
+            const email = attendee.emailAddress?.address || attendee.email_address?.address || 'unknown';
+            const name = attendee.emailAddress?.name || attendee.email_address?.name || email.split('@')[0];
+            return `   • ${name} <${email}>`;
+          });
+        };
+
+        // Get location from the response
+        const eventLocation = typeof event.location === 'string' 
+          ? event.location 
+          : event.location?.displayName || 'No location specified';
+
+        // Get online meeting URL if available
+        const onlineMeetingUrl = event.onlineMeeting?.joinUrl || 
+                               (typeof event.onlineMeeting === 'string' ? event.onlineMeeting : undefined);
+
         const responseText = [
           "✅ Event created successfully!",
           "",
           `📅 ${event.subject || 'No subject'}`,
-          `🕒 ${formatEventDate(event.start?.dateTime, event.start?.timeZone)} - ${formatEventDate(event.end?.dateTime, event.end?.timeZone)}`,
-          ...(event.location?.displayName ? [`📍 ${event.location.displayName}`] : []),
-          ...(event.onlineMeeting?.joinUrl ? [`🔗 Join: ${event.onlineMeeting.joinUrl}`] : []),
-          ...(attendeeList.length > 0 ? ["", "👥 Attendees:", ...attendeeList.map((email: string) => `   • ${email}`)] : [])
+          `🕒 ${formatEventDate(event.start?.dateTime)} - ${formatEventDate(event.end?.dateTime)}`,
+          `📍 ${eventLocation}`,
+          ...(onlineMeetingUrl ? [`🔗 Join: ${onlineMeetingUrl}`] : []),
+          ...(event.attendees?.length ? ["", "👥 Attendees:", ...formatAttendees(event.attendees)] : [])
         ].join('\n');
 
         return {

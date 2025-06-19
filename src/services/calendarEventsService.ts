@@ -112,9 +112,14 @@ export interface CalendarEvent {
       name: string;
     };
   };
+  location?: string | EventLocation | null;
+  onlineMeeting?: {
+    joinUrl?: string;
+    [key: string]: any;
+  } | null;
   attendees?: Array<{
     type: string;
-    status: {
+    status?: {
       response: string;
       time: string;
     };
@@ -129,6 +134,7 @@ export interface CalendarEvent {
   }>;
   bodyPreview?: string;
   webLink?: string;
+  [key: string]: any; // Allow additional properties
 }
 
 /**
@@ -204,30 +210,137 @@ export async function fetchCalendarEvents(
 }
 
 /**
- * Create a new calendar event
+ * Create a new calendar event (supports both regular and recurring events)
  * @param userId User ID or 'me' for current user
  * @param eventData Event data to create
  * @returns The created calendar event
  */
+// Extended interface for the event data we expect to receive
+export interface CreateEventRequestExtended extends Omit<CreateEventRequest, 'start' | 'end' | 'attendees' | 'location' | 'isOnlineMeeting' | 'importance' | 'body' | 'recurrence'> {
+  start_datetime: string;
+  end_datetime: string;
+  is_online_meeting?: boolean;
+  recurrence?: {
+    type: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'absoluteMonthly' | 'relativeMonthly' | 'absoluteYearly' | 'relativeYearly';
+    interval: number;
+    range_type: 'endDate' | 'noEnd' | 'numbered';
+    end_date?: string;
+    number_of_occurrences?: number;
+  };
+  attendees?: string[];
+  importance?: string;
+  location?: string; // We'll convert this to EventLocation in the function
+  body?: {
+    content: string;
+    contentType?: 'text' | 'html';
+  };
+}
+
 export async function createCalendarEvent(
   userId: string,
-  eventData: CreateEventRequest
+  eventData: CreateEventRequestExtended
 ): Promise<CalendarEvent> {
   const client = getAuthenticatedClient();
+  const timeZone = 'Asia/Manila';
   
   try {
     // Ensure required fields are present
     if (!eventData.subject) {
       throw new Error('Event subject is required');
     }
-    if (!eventData.start || !eventData.end) {
+    if (!eventData.start_datetime || !eventData.end_datetime) {
       throw new Error('Event start and end times are required');
+    }
+
+    // Prepare the event payload for Microsoft Graph API
+    const eventPayload: CreateEventRequest = {
+      subject: eventData.subject,
+      body: {
+        contentType: 'html',
+        content: eventData.body?.content || ''
+      },
+      start: {
+        dateTime: eventData.start_datetime,
+        timeZone: timeZone
+      },
+      end: {
+        dateTime: eventData.end_datetime,
+        timeZone: timeZone
+      },
+      isOnlineMeeting: eventData.is_online_meeting,
+      importance: (eventData.importance as 'low' | 'normal' | 'high') || 'normal',
+      responseRequested: true
+    };
+
+    // Handle location
+    if (eventData.location) {
+      eventPayload.location = {
+        displayName: eventData.location as unknown as string
+      };
+    }
+
+    // Handle attendees
+    if (eventData.attendees && eventData.attendees.length > 0) {
+      eventPayload.attendees = eventData.attendees
+        .filter((email): email is string => typeof email === 'string' && email.includes('@'))
+        .map(email => {
+          const trimmedEmail = email.trim();
+          return {
+            emailAddress: {
+              address: trimmedEmail,
+              name: trimmedEmail.split('@')[0]
+            },
+            type: 'required' as const
+          };
+        });
+    }
+
+    // Handle recurrence if specified
+    if (eventData.recurrence) {
+      const { type, interval, range_type, end_date, number_of_occurrences } = eventData.recurrence;
+      
+      const pattern: RecurrencePattern = {
+        type: type as any,
+        interval: interval || 1
+      };
+
+      const range: RecurrenceRange = {
+        type: range_type,
+        startDate: new Date(eventData.start_datetime).toISOString().split('T')[0],
+        recurrenceTimeZone: timeZone
+      };
+
+      if (range_type === 'endDate' && end_date) {
+        range.endDate = end_date;
+      } else if (range_type === 'numbered' && number_of_occurrences) {
+        range.numberOfOccurrences = number_of_occurrences;
+      }
+
+      // Convert to PatternedRecurrence format expected by Microsoft Graph
+      eventPayload.recurrence = {
+        pattern: {
+          type: pattern.type,
+          interval: pattern.interval,
+          ...(pattern.daysOfWeek && { daysOfWeek: pattern.daysOfWeek }),
+          ...(pattern.dayOfMonth && { dayOfMonth: pattern.dayOfMonth }),
+          ...(pattern.month && { month: pattern.month }),
+          ...(pattern.firstDayOfWeek && { firstDayOfWeek: pattern.firstDayOfWeek }),
+          ...(pattern.index && { index: pattern.index })
+        },
+        range: {
+          type: range.type,
+          startDate: range.startDate,
+          ...(range.endDate && { endDate: range.endDate }),
+          ...(range.numberOfOccurrences && { numberOfOccurrences: range.numberOfOccurrences }),
+          recurrenceTimeZone: range.recurrenceTimeZone
+        }
+      } as PatternedRecurrence;
     }
 
     // Create the event using Microsoft Graph API
     const createdEvent = await client
       .api(`/users/${userId}/events`)
-      .post(eventData);
+      .post(eventPayload);
 
     return createdEvent;
   } catch (error: unknown) {
