@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { toZonedTime, formatInTimeZone } from "date-fns-tz";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { fetchCalendarEvents, formatCalendarEvents, type CalendarEvent } from "../services/graphService.js";
+import { fetchCalendarEvents, formatCalendarEvents, createCalendarEvent, type CalendarEvent, CreateEventRequest } from "../services/graphService.js";
 
 // Load environment variables
 import dotenv from 'dotenv';
@@ -186,6 +186,85 @@ export function registerCalendarTools(server: McpServer): void {
               text: `Error: ${errorMessage}`
             }
           ]
+        };
+      }
+    }
+  );
+
+  // Register the create-calendar-event tool with hardcoded data
+  server.tool(
+    'create-calendar-event',
+    'Create a new calendar event with hardcoded data',
+    {
+      user_id: z.string().default("me").describe("Microsoft Graph user ID or 'me' to use USER_ID from .env")
+    },
+    async (args: any) => {
+      try {
+        let { user_id = 'me' } = args;
+        
+        // If user_id is 'me', use the USER_ID from .env
+        if (user_id === 'me') {
+          if (!process.env.USER_ID) {
+            return {
+              content: [{
+                type: "text",
+                text: "Error: USER_ID is not set in .env file"
+              }]
+            };
+          }
+          user_id = process.env.USER_ID;
+        }
+
+        // Hardcoded event data
+        const eventData = {
+          subject: 'Team Sync Meeting',
+          start: {
+            dateTime: '2025-06-20T14:00:00',
+            timeZone: 'Asia/Manila'
+          },
+          end: {
+            dateTime: '2025-06-20T15:00:00',
+            timeZone: 'Asia/Manila'
+          },
+          location: {
+            displayName: 'Virtual Meeting'
+          },
+          body: {
+            contentType: 'text',
+            content: 'This is a test event created from the MCP server.'
+          },
+          isOnlineMeeting: true,
+          isReminderOn: true
+        };
+
+        // Create the event using the Graph API
+        const event = await createCalendarEvent(user_id, eventData as CreateEventRequest);
+        
+        // Format the response
+        return {
+          content: [{
+            type: 'text',
+            text: `✅ Event created successfully!\n\n` +
+                  `📅 ${event.subject || 'No subject'}\n` +
+                  `🕒 ${new Date(event.start?.dateTime || '').toLocaleString()} - ${new Date(event.end?.dateTime || '').toLocaleString()}\n`
+          }],
+          _meta: {
+            event: event,
+            success: true
+          }
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Error creating calendar event:', error);
+        return {
+          content: [{
+            type: 'text',
+            text: `❌ Error creating calendar event: ${errorMessage}`
+          }],
+          _meta: {
+            error: true,
+            errorMessage: errorMessage
+          }
         };
       }
     }

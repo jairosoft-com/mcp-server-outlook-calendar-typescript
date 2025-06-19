@@ -8,6 +8,89 @@ interface GraphResponse<T> {
   "@odata.nextLink"?: string;
 }
 
+// Interfaces for creating events
+export interface EmailAddress {
+  address: string;
+  name?: string;
+}
+
+export interface EventAttendee {
+  emailAddress: EmailAddress;
+  type?: 'required' | 'optional' | 'resource';
+  status?: {
+    response: 'none' | 'organizer' | 'tentativelyAccepted' | 'accepted' | 'declined' | 'notResponded';
+    time?: string;
+  };
+}
+
+export interface EventLocation {
+  displayName: string;
+  locationType?: 'default' | 'conferenceRoom' | 'homeAddress' | 'businessAddress' | 'geoCoordinates' | 'streetAddress' | 'hotel' | 'restaurant' | 'localBusiness' | 'postalAddress';
+  uniqueId?: string;
+  uniqueIdType?: 'unknown' | 'locationStore' | 'directory' | 'private' | 'bing';
+}
+
+export interface RecurrencePattern {
+  type: 'daily' | 'weekly' | 'absoluteMonthly' | 'relativeMonthly' | 'absoluteYearly' | 'relativeYearly';
+  interval: number;
+  month?: number;
+  dayOfMonth?: number;
+  daysOfWeek?: string[];
+  firstDayOfWeek?: 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday';
+  index?: 'first' | 'second' | 'third' | 'fourth' | 'last';
+}
+
+export interface RecurrenceRange {
+  type: 'endDate' | 'noEnd' | 'numbered';
+  startDate: string; // ISO date string
+  endDate?: string;   // ISO date string
+  numberOfOccurrences?: number;
+  recurrenceTimeZone?: string;
+}
+
+export interface PatternedRecurrence {
+  pattern: RecurrencePattern;
+  range: RecurrenceRange;
+}
+
+export interface DateTimeTimeZone {
+  dateTime: string;
+  timeZone: string;
+}
+
+export interface ItemBody {
+  contentType: 'text' | 'html';
+  content: string;
+}
+
+export interface CreateEventRequest {
+  subject: string;
+  body?: ItemBody;
+  start: DateTimeTimeZone;
+  end: DateTimeTimeZone;
+  location?: EventLocation;
+  locations?: EventLocation[];
+  attendees?: EventAttendee[];
+  isOnlineMeeting?: boolean;
+  onlineMeetingProvider?: 'teamsForBusiness' | 'skypeForBusiness' | 'teamsForConsumer';
+  isAllDay?: boolean;
+  importance?: 'low' | 'normal' | 'high';
+  recurrence?: PatternedRecurrence;
+  responseRequested?: boolean;
+  allowNewTimeProposals?: boolean;
+  transactionId?: string;
+  originalStartTimeZone?: string;
+  originalEndTimeZone?: string;
+  iCalUId?: string;
+  reminderMinutesBeforeStart?: number;
+  isReminderOn?: boolean;
+  hasAttachments?: boolean;
+  categories?: string[];
+  seriesMasterId?: string;
+  showAs?: 'free' | 'tentative' | 'busy' | 'oof' | 'workingElsewhere' | 'unknown';
+  type?: 'singleInstance' | 'occurrence' | 'exception' | 'seriesMaster';
+}
+
 export interface CalendarEvent {
   id: string;
   subject: string;
@@ -117,6 +200,40 @@ export async function fetchCalendarEvents(
     console.error('Error fetching calendar events:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     throw new Error(`Failed to fetch calendar events: ${errorMessage}`);
+  }
+}
+
+/**
+ * Create a new calendar event
+ * @param userId User ID or 'me' for current user
+ * @param eventData Event data to create
+ * @returns The created calendar event
+ */
+export async function createCalendarEvent(
+  userId: string,
+  eventData: CreateEventRequest
+): Promise<CalendarEvent> {
+  const client = getAuthenticatedClient();
+  
+  try {
+    // Ensure required fields are present
+    if (!eventData.subject) {
+      throw new Error('Event subject is required');
+    }
+    if (!eventData.start || !eventData.end) {
+      throw new Error('Event start and end times are required');
+    }
+
+    // Create the event using Microsoft Graph API
+    const createdEvent = await client
+      .api(`/users/${userId}/events`)
+      .post(eventData);
+
+    return createdEvent;
+  } catch (error: unknown) {
+    console.error('Error creating calendar event:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`Failed to create calendar event: ${errorMessage}`);
   }
 }
 
