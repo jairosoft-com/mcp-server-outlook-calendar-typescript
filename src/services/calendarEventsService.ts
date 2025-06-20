@@ -227,6 +227,9 @@ export interface CreateEventRequestExtended extends Omit<CreateEventRequest, 'st
     range_type: 'endDate' | 'noEnd' | 'numbered';
     end_date?: string;
     number_of_occurrences?: number;
+    month_day?: number;
+    week_day?: 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday';
+    week_index?: 'first' | 'second' | 'third' | 'fourth' | 'last';
   };
   attendees?: string[];
   importance?: string;
@@ -306,19 +309,61 @@ export async function createCalendarEvent(
         interval: interval || 1
       };
       
-      // Handle days of week for weekly recurrence
-      if (type === 'weekly') {
-        if (eventData.days_of_week?.length) {
-          // Capitalize first letter of each day to match Microsoft Graph API requirements
-          pattern.daysOfWeek = eventData.days_of_week.map((day: string) => 
-            day.charAt(0).toUpperCase() + day.slice(1).toLowerCase()
-          );
-        } else {
-          // If no days specified, default to the day of the start date
-          const startDate = new Date(eventData.start_datetime);
+      // Get the start date once to use for calculations
+      const startDate = new Date(eventData.start_datetime);
+      
+      // Handle recurrence patterns based on type
+      switch (type) {
+        case 'weekly':
+          // Handle weekly recurrence
+          if (eventData.days_of_week?.length) {
+            // Capitalize first letter of each day to match Microsoft Graph API requirements
+            pattern.daysOfWeek = eventData.days_of_week.map((day: string) => 
+              day.charAt(0).toUpperCase() + day.slice(1).toLowerCase()
+            );
+          } else {
+            // If no days specified, default to the day of the start date
+            const dayOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][startDate.getDay()];
+            pattern.daysOfWeek = [dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1)];
+          }
+          break;
+          
+        case 'absoluteMonthly':
+          // For absolute monthly, use the day of the month from the start date
+          // This ensures the event recurs on the same day of the month as the start date
+          pattern.dayOfMonth = startDate.getDate();
+          break;
+          
+        case 'relativeMonthly':
+          // For relative monthly, calculate the week day and week index from the start date
           const dayOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][startDate.getDay()];
+          
+          // Calculate which week of the month this date falls on (1-5)
+          const day = startDate.getDate();
+          const weekOfMonth = Math.ceil(day / 7);
+          
+          // Get the last day of the month to check if this is the last week
+          const lastDayOfMonth = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate();
+          
+          // Determine the week index (first, second, third, fourth, or last)
+          let weekIndex: 'first' | 'second' | 'third' | 'fourth' | 'last';
+          if (day + 7 > lastDayOfMonth) {
+            weekIndex = 'last';
+          } else {
+            const indexMap = ['first', 'second', 'third', 'fourth'] as const;
+            weekIndex = indexMap[weekOfMonth - 1] || 'last';
+          }
+          
+          // Set the pattern properties
           pattern.daysOfWeek = [dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1)];
-        }
+          pattern.index = weekIndex;
+          break;
+          
+        case 'monthly':
+          // For backward compatibility, treat 'monthly' the same as 'absoluteMonthly'
+          pattern.type = 'absoluteMonthly';  // Explicitly set the type
+          pattern.dayOfMonth = startDate.getDate();
+          break;
       }
 
       const range: RecurrenceRange = {
@@ -334,7 +379,7 @@ export async function createCalendarEvent(
       }
 
       // Log the pattern for debugging
-      console.error('Recurrence pattern:', {
+      console.error('Recurrence pattern:', JSON.stringify({
         type: pattern.type,
         interval: pattern.interval,
         daysOfWeek: pattern.daysOfWeek,
@@ -342,7 +387,7 @@ export async function createCalendarEvent(
         month: pattern.month,
         firstDayOfWeek: pattern.firstDayOfWeek,
         index: pattern.index
-      });
+      }, null, 2));
 
       // Convert to PatternedRecurrence format expected by Microsoft Graph
       eventPayload.recurrence = {

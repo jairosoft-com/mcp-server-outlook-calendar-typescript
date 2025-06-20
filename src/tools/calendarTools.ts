@@ -205,24 +205,30 @@ export function registerCalendarTools(server: McpServer): void {
           ...(args.days_of_week?.length && { days_of_week: args.days_of_week })
         };
         
-        // If this is a recurring event, add the recurrence details
+        // Handle recurrence if specified
         if (is_recurring) {
           const recurrence: any = {
             type: recurrence_type,
-            interval: recurrence_interval || 1,  // Ensure interval is at least 1
+            interval: recurrence_interval || 1,
             range_type: recurrence_range_type,
             ...(recurrence_range_type === 'endDate' && recurrence_end_date && { end_date: recurrence_end_date }),
             ...(recurrence_range_type === 'numbered' && recurrence_occurrences && { number_of_occurrences: recurrence_occurrences })
           };
-          
-          // For weekly events, ensure days_of_week is included in the recurrence pattern
-          if (recurrence_type === 'weekly') {
-            if (args.days_of_week?.length) {
-              recurrence.days_of_week = args.days_of_week;
-              eventDataWithRecurrence.days_of_week = args.days_of_week;
-            }
+
+          // Add recurrence pattern based on type
+          if (recurrence_type === 'weekly' && args.days_of_week?.length) {
+            // For weekly recurrence, add days of week
+            recurrence.days_of_week = args.days_of_week;
+            eventDataWithRecurrence.days_of_week = args.days_of_week;
+          } else if (recurrence_type === 'absoluteMonthly' && args.month_day) {
+            // For absolute monthly recurrence, add day of month
+            recurrence.month_day = args.month_day;
+          } else if (recurrence_type === 'relativeMonthly' && args.week_day && args.week_index) {
+            // For relative monthly recurrence, add day of week and week index
+            recurrence.week_day = args.week_day;
+            recurrence.week_index = args.week_index;
           }
-          
+
           eventDataWithRecurrence.recurrence = recurrence;
         }
         
