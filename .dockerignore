@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log
+# Temporarily including build directory for Docker
+# build
+.env
+.git
+.gitignore
+.vscode
+*.md
+*.mdx
+!DOCKER-README.md
+*.ts
+!tsconfig*.json
+*.test.*
+coverage
