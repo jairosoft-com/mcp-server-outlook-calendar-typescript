@@ -1,8 +1,18 @@
 // Type declarations for modules without type definitions
 declare module '@modelcontextprotocol/sdk/server/stdio.js' {
-    export class StdioServerTransport {
+    export interface Transport {
+        start(): Promise<void>;
+        send(data: any): Promise<void>;
+        close(): Promise<void>;
+        onData(handler: (data: any) => void): void;
+    }
+
+    export class StdioServerTransport implements Transport {
         constructor();
-        // Add any methods you need from the StdioServerTransport class
+        start(): Promise<void>;
+        send(data: any): Promise<void>;
+        close(): Promise<void>;
+        onData(handler: (data: any) => void): void;
     }
 }
 
