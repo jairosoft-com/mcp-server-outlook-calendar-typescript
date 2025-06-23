@@ -13,8 +13,6 @@ registerTools(server);
 // Start the server
 async function main() {
   const transport = new StdioServerTransport();
-  // Start the transport before connecting
-  await transport.start();
   await server.connect(transport);
   console.error("Calendar MCP Server running on stdio");
 }
