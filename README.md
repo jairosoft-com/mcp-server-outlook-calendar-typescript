@@ -31,6 +31,49 @@ A Model Context Protocol (MCP) server implementation with Microsoft Calendar int
 - A Microsoft 365 developer account or business account with calendar access
 - Azure AD application registration with necessary permissions
 
+## Claude Desktop Integration
+
+To connect this MCP server to Claude Desktop, you'll need to configure it with your Azure AD credentials and project paths. Here's how to set it up:
+
+1. Copy the example configuration file:
+   ```bash
+   cp claude-config.json.example claude-config.json
+   ```
+
+2. Edit `claude-config.json` with your actual values:
+   - Update the `NODE_PATH` with the full path to your project directory
+   - Replace all placeholder values with your actual Azure AD credentials
+   - Update the path in `args` to point to your built `index.js` file
+
+3. In Claude Desktop, load this configuration file in the MCP servers settings.
+
+### Configuration Notes:
+- All environment variables must be provided in the `env` object as Claude Desktop doesn't support loading from `.env` files directly
+- The server must be built (`npm run build`) before connecting from Claude Desktop
+- For security, never commit your actual `claude-config.json` with real credentials to version control
+
+### Example Configuration (with placeholders):
+
+```json
+{
+  "mcpServers": {
+    "calendar": {
+      "command": "node",
+      "env": {
+        "NODE_ENV": "production",
+        "NODE_PATH": "/path/to/mcp-server-outlook-calendar-typescript",
+        "AZURE_TENANT_ID": "your-azure-tenant-id",
+        "AZURE_CLIENT_ID": "your-azure-client-id",
+        "AZURE_CLIENT_SECRET": "your-azure-client-secret",
+        "USER_ID": "your-user-id-or-me",
+        "USER_EMAIL": "your-email@example.com"
+      },
+      "args": ["/path/to/mcp-server-outlook-calendar-typescript/build/index.js"]
+    }
+  }
+}
+```
+
 ## Local Development Setup
 
 ### 1. Clone the repository
