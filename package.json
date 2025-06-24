@@ -2,12 +2,30 @@
   "name": "mcp-quickstart-ts",
   "version": "1.0.0",
   "main": "index.js",
-  "type": "module",
+  "devDependencies": {
+    "@types/chai": "^4.3.10",
+    "@types/mocha": "^10.0.6",
+    "chai": "^5.1.1",
+    "mocha": "^10.4.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
   "bin": {
     "weather": "./build/index.js"
   },
   "scripts": {
-    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\""
+    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "test": "mocha",
+    "test:watch": "mocha --watch"
+  },
+  "mocha": {
+    "require": [
+      "ts-node/register"
+    ],
+    "extension": [
+      "ts"
+    ],
+    "timeout": 15000
   },
   "files": [
     "build"
@@ -16,12 +34,12 @@
   "author": "",
   "license": "ISC",
   "description": "",
-  "devDependencies": {
-    "@types/node": "^22.15.32",
-    "typescript": "^5.8.3"
-  },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.3",
+    "@azure/identity": "^4.10.1",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "@modelcontextprotocol/sdk": "^1.13.0",
+    "date-fns-tz": "^3.2.0",
+    "dotenv": "^16.5.0",
     "zod": "^3.25.67"
   }
 }

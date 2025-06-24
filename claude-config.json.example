@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "calendar": {
+      "command": "node",
+      "env": {
+        "NODE_ENV": "production",
+        "NODE_PATH": "/path/to/mcp-server-outlook-calendar-typescript",
+        "AZURE_TENANT_ID": "your-azure-tenant-id",
+        "AZURE_CLIENT_ID": "your-azure-client-id",
+        "AZURE_CLIENT_SECRET": "your-azure-client-secret",
+        "USER_ID": "your-user-id-or-me",
+        "USER_EMAIL": "your-email@example.com"
+      },
+      "args": ["/path/to/mcp-server-outlook-calendar-typescript/build/index.js"]
+    }
+  }
+}
