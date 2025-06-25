@@ -101,3 +101,7 @@ docker
 Arguments:
 run -i --rm -e AZURE_TENANT_ID="your-tenant-id" -e AZURE_CLIENT_ID="your-client-id" -e
 AZURE_CLIENT_SECRET="your-client-secret" -e USER_ID="your-user-id" mcp-outlook-calendar
+
+
+## for clients, Pull the docker image from Azure Container Registry:
+docker pull jairo.azurecr.io/mcpserver:latest
