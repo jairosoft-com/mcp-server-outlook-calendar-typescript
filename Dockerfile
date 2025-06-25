@@ -8,10 +8,11 @@ FROM node:18.19.1-alpine3.19
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY . ./
 
 # Install only production dependencies
-RUN npm ci --only=production --legacy-peer-deps
+RUN npm ci --legacy-peer-deps
+RUN npm run build
 
 # Copy built files from host
 COPY build/ ./build/
