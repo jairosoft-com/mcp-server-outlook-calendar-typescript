@@ -85,3 +85,19 @@ Update your `claude_desktop_config.json` to use the Docker container:
 - Never commit your `.env` file to version control
 - Use Docker secrets or a secrets manager for production environments
 - Ensure your Azure AD app has the minimum required permissions
+
+
+## Docker Commands:
+docker build -t mcp-outlook-calendar .
+docker images mcp-outlook-calendar
+
+Running docker image paste it as one line:
+docker run -it --rm -e AZURE_TENANT_ID="your-tenant-id" -e AZURE_CLIENT_ID="your-client-id" -e AZURE_CLIENT_SECRET="your-client-secret" -e USER_ID="your-user-id" mcp-outlook-calendar
+
+## Running Docker Container in MCP-inspector
+Command:
+docker
+
+Arguments:
+run -i --rm -e AZURE_TENANT_ID="your-tenant-id" -e AZURE_CLIENT_ID="your-client-id" -e
+AZURE_CLIENT_SECRET="your-client-secret" -e USER_ID="your-user-id" mcp-outlook-calendar
