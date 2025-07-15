@@ -1,6 +1,6 @@
-# MCP Server with Outlook Calendar Integration (SSE Version)
+# Outlook Calendar SSE Server
 
-A Model Context Protocol (MCP) server implementation with Microsoft Calendar integration, built with TypeScript and Node.js. This server provides calendar event management through the MCP protocol with support for Server-Sent Events (SSE), recurring events, timezone handling, and more.
+A lightweight server that provides real-time access to Microsoft Outlook Calendar events using Server-Sent Events (SSE). Built with TypeScript and Node.js, this server offers a simple and efficient way to stream calendar events to clients with support for timezone handling, event filtering, and more.
 
 ## Technology Stack
 
@@ -9,45 +9,159 @@ A Model Context Protocol (MCP) server implementation with Microsoft Calendar int
 - **Authentication**: Microsoft Identity Platform (Azure AD)
 - **APIs**: Microsoft Graph API, Server-Sent Events (SSE)
 - **Package Manager**: npm 9.x or later
+- **Testing**: Vitest for unit and integration tests
 - **Deployment**: Compatible with GCP, Azure, and other cloud platforms
 
 ## Features
 
-- **Calendar Integration**
-  - Create, read, and manage calendar events in Microsoft 365/Outlook
-  - Real-time event updates using Server-Sent Events (SSE)
-  - Support for recurring events (daily, weekly, monthly patterns)
-  - Timezone support for event times
-  - Event filtering by date range
-  - Web-based API endpoints for integration with other services
+- **Real-time Calendar Integration**
+  - Stream calendar events in real-time using Server-Sent Events (SSE)
+  - Create and manage calendar events in Microsoft 365/Outlook
+  - Full support for recurring events (daily, weekly, monthly patterns)
+  - Timezone-aware event handling
+  - Filter events by date range and other criteria
+  - RESTful API endpoints for standard CRUD operations
 
-- **Developer Experience**
-  - TypeScript support with strict type safety
+- **Developer Friendly**
+  - TypeScript with strict type safety
   - Environment-based configuration
-  - Comprehensive error handling
+  - Comprehensive error handling and logging
   - Built-in development server with hot-reload
+  - Test suite with Vitest
 
 ## Prerequisites
 
 - Node.js 18.x or later
 - npm 9.x or later
-- A Microsoft 365 developer account or business account with calendar access
+- Microsoft 365 developer or business account with calendar access
 - Azure AD application registration with necessary permissions
-- (For development) mcp-inspector for testing SSE connections
 
-## Server-Sent Events (SSE) Implementation
+## Getting Started
 
-This implementation uses Server-Sent Events (SSE) to provide real-time updates for calendar events. The server exposes the following endpoints:
+### 1. Clone the repository
 
-- `GET /events` - SSE endpoint for real-time calendar updates
-- `GET /api/calendar/events` - REST API endpoint to fetch calendar events
+```bash
+git clone <repository-url>
+cd outlook-calendar-sse-server
+```
 
-### Testing with mcp-inspector
+### 2. Install dependencies
 
-To test the SSE implementation with mcp-inspector:
+```bash
+npm install
+```
 
-1. Start the server in development mode:
+### 3. Configure environment variables
+
+Create a `.env` file in the root directory with the following variables:
+
+```env
+PORT=3000
+AZURE_CLIENT_ID=your_client_id
+AZURE_TENANT_ID=your_tenant_id
+AZURE_CLIENT_SECRET=your_client_secret
+REDIRECT_URI=http://localhost:3000/auth/callback
+```
+
+### 4. Build the project
+
+```bash
+npm run build
+```
+
+### 5. Start the server
+
+For development with hot-reload:
+
+```bash
+npm run dev
+```
+
+For production:
+
+```bash
+npm start
+```
+
+## API Endpoints
+
+### Server-Sent Events (SSE)
+
+- `GET /events` - Subscribe to real-time calendar event updates
+
+### REST API
+
+- `GET /api/calendar/events` - Fetch calendar events
+- `POST /api/calendar/events` - Create a new calendar event
+- `GET /api/calendar/events/:id` - Get a specific event
+- `PATCH /api/calendar/events/:id` - Update an existing event
+- `DELETE /api/calendar/events/:id` - Delete an event
+
+## Testing
+
+Run the test suite:
+
+```bash
+npm test
+```
+
+Generate test coverage report:
+
+```bash
+npm run coverage
+```
+
+## Deployment
+
+### Prerequisites
+
+- Node.js 18.x or later
+- Environment variables properly configured
+- Azure AD application registered with correct permissions
+
+### Steps
+
+1. Build the application:
    ```bash
+   npm run build
+   ```
+
+2. Start the server:
+   ```bash
+   npm start
+   ```
+
+   The server will be available at `http://localhost:3000` by default.
+
+## Environment Variables
+
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| PORT | Port to run the server on | No | 3000 |
+| AZURE_CLIENT_ID | Azure AD Application (client) ID | Yes | - |
+| AZURE_TENANT_ID | Azure AD Directory (tenant) ID | Yes | - |
+| AZURE_CLIENT_SECRET | Azure AD Application client secret | Yes | - |
+| REDIRECT_URI | Redirect URI for authentication | Yes | - |
+| NODE_ENV | Application environment (development/production) | No | development |
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/overview)
+- [Node.js](https://nodejs.org/)
+- [TypeScript](https://www.typescriptlang.org/)
+- [date-fns](https://date-fns.org/) for date manipulation
    npm run dev
    ```
 

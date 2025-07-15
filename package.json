@@ -1,16 +1,16 @@
 {
-  "name": "mcp-server-outlook-calendar",
+  "name": "outlook-calendar-sse-server",
   "version": "1.0.0",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "ts-node --esm src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest",
+    "coverage": "vitest run --coverage"
   },
   "keywords": [
-    "mcp",
     "outlook",
     "calendar",
     "sse",
@@ -18,22 +18,21 @@
   ],
   "author": "",
   "license": "MIT",
-  "description": "MCP Server for Outlook Calendar with SSE support",
+  "description": "Outlook Calendar API with Server-Sent Events (SSE) support",
   "devDependencies": {
     "@types/node": "^22.16.3",
+    "@vitest/coverage-v8": "^1.6.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vitest": "^1.6.0"
   },
   "dependencies": {
     "@azure/identity": "^4.0.0",
     "@microsoft/microsoft-graph-client": "^3.0.0",
-    "@modelcontextprotocol/sdk": "^1.12.3",
-    "cors": "^2.8.5",
     "date-fns-tz": "^3.2.0",
     "dotenv": "^16.0.0",
-    "express": "^4.18.3",
     "isomorphic-fetch": "^3.0.0",
-    "url": "^0.11.3",
     "zod": "^3.25.67"
   }
 }
