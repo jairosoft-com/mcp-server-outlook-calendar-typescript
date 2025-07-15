@@ -1,22 +1,25 @@
-# MCP Server with Outlook Calendar Integration
+# MCP Server with Outlook Calendar Integration (SSE Version)
 
-A Model Context Protocol (MCP) server implementation with Microsoft Calendar integration, built with TypeScript and Node.js. This server provides calendar event management through the MCP protocol with support for recurring events, timezone handling, and more.
+A Model Context Protocol (MCP) server implementation with Microsoft Calendar integration, built with TypeScript and Node.js. This server provides calendar event management through the MCP protocol with support for Server-Sent Events (SSE), recurring events, timezone handling, and more.
 
 ## Technology Stack
 
-- **Runtime**: Node.js 16.x or later
-- **Language**: TypeScript 4.9+
+- **Runtime**: Node.js 18.x or later
+- **Language**: TypeScript 5.0+
 - **Authentication**: Microsoft Identity Platform (Azure AD)
-- **APIs**: Microsoft Graph API
-- **Package Manager**: npm 7.x or later
+- **APIs**: Microsoft Graph API, Server-Sent Events (SSE)
+- **Package Manager**: npm 9.x or later
+- **Deployment**: Compatible with GCP, Azure, and other cloud platforms
 
 ## Features
 
 - **Calendar Integration**
   - Create, read, and manage calendar events in Microsoft 365/Outlook
+  - Real-time event updates using Server-Sent Events (SSE)
   - Support for recurring events (daily, weekly, monthly patterns)
   - Timezone support for event times
   - Event filtering by date range
+  - Web-based API endpoints for integration with other services
 
 - **Developer Experience**
   - TypeScript support with strict type safety
@@ -26,10 +29,82 @@ A Model Context Protocol (MCP) server implementation with Microsoft Calendar int
 
 ## Prerequisites
 
-- Node.js 16.x or later
-- npm 7.x or later
+- Node.js 18.x or later
+- npm 9.x or later
 - A Microsoft 365 developer account or business account with calendar access
 - Azure AD application registration with necessary permissions
+- (For development) mcp-inspector for testing SSE connections
+
+## Server-Sent Events (SSE) Implementation
+
+This implementation uses Server-Sent Events (SSE) to provide real-time updates for calendar events. The server exposes the following endpoints:
+
+- `GET /events` - SSE endpoint for real-time calendar updates
+- `GET /api/calendar/events` - REST API endpoint to fetch calendar events
+
+### Testing with mcp-inspector
+
+To test the SSE implementation with mcp-inspector:
+
+1. Start the server in development mode:
+   ```bash
+   npm run dev
+   ```
+
+2. Open mcp-inspector and connect to the SSE endpoint:
+   ```
+   http://localhost:3000/events
+   ```
+
+3. Send test events using the broadcast endpoint (for testing):
+   ```bash
+   curl -X POST http://localhost:3000/api/broadcast -H "Content-Type: application/json" -d '{"event": "test", "data": "Test message"}'
+   ```
+
+4. You should see the events appear in mcp-inspector in real-time.
+
+## Deployment
+
+### Local Development
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Update the `.env` file with your Azure AD credentials and configuration.
+
+4. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+### Production Deployment
+
+1. Build the application:
+   ```bash
+   npm run build
+   ```
+
+2. Start the production server:
+   ```bash
+   npm start
+   ```
+
+### Environment Variables
+
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| `PORT` | Port to run the server on | No | 3000 |
+| `NODE_ENV` | Environment (development/production) | No | development |
+| `AZURE_TENANT_ID` | Azure AD tenant ID | Yes | - |
+| `AZURE_CLIENT_ID` | Azure AD application client ID | Yes | - |
+| `AZURE_CLIENT_SECRET` | Azure AD client secret | Yes | - |
 
 ## Claude Desktop Integration
 

@@ -1,32 +1,39 @@
 {
-  "name": "mcp-server-node",
+  "name": "mcp-server-outlook-calendar",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/index.js",
   "type": "module",
-  "bin": {
-    "weather": "./build/index.js"
-  },
   "scripts": {
-    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\""
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node --esm src/index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "files": [
-    "build"
+  "keywords": [
+    "mcp",
+    "outlook",
+    "calendar",
+    "sse",
+    "server-sent-events"
   ],
-  "keywords": [],
   "author": "",
-  "license": "ISC",
-  "description": "",
+  "license": "MIT",
+  "description": "MCP Server for Outlook Calendar with SSE support",
   "devDependencies": {
-    "@types/node": "^22.15.32",
+    "@types/node": "^22.16.3",
+    "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   },
   "dependencies": {
     "@azure/identity": "^4.0.0",
     "@microsoft/microsoft-graph-client": "^3.0.0",
     "@modelcontextprotocol/sdk": "^1.12.3",
+    "cors": "^2.8.5",
     "date-fns-tz": "^3.2.0",
     "dotenv": "^16.0.0",
+    "express": "^4.18.3",
     "isomorphic-fetch": "^3.0.0",
+    "url": "^0.11.3",
     "zod": "^3.25.67"
   }
 }
