@@ -20,12 +20,22 @@ export async function handleCreateCalendarEvent(req: IncomingMessage, res: Serve
   return new Promise((resolve) => {
     req.on('end', async () => {
       try {
-        const eventData = JSON.parse(body);
-        const { accessToken, ...eventDetails } = eventData;
+        // Extract access token from Authorization header
+        const authHeader = req.headers['authorization'];
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ 
+            error: 'Unauthorized',
+            details: 'Authorization header with Bearer token is required'
+          }));
+          return resolve();
+        }
+        const accessToken = authHeader.split(' ')[1];
 
-        // Validate request data using the schema
+        // Parse and validate request body
+        const eventData = JSON.parse(body);
         const schema = z.object(createEventToolSchema);
-        const validation = schema.safeParse({ accessToken, ...eventDetails });
+        const validation = schema.safeParse(eventData);
 
         if (!validation.success) {
           const errorMessages = validation.error.issues.map(issue => 
@@ -70,10 +80,21 @@ export async function handleCalendarEvents(req: IncomingMessage, res: ServerResp
     const { query } = parse(req.url || '', true);
     console.log('Request query parameters:', JSON.stringify(query, null, 2));
     
+    // Extract access token from Authorization header
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Unauthorized',
+        details: 'Authorization header with Bearer token is required'
+      }));
+      return;
+    }
+    const accessToken = authHeader.split(' ')[1];
+    
     // Validate query parameters using the schema
     const schema = z.object(fetchCalendarEventsSchema);
     const validation = schema.safeParse({
-      accessToken: query.accessToken,
       start_date: query.start_date,
       end_date: query.end_date,
       timezone: query.timezone
@@ -82,9 +103,7 @@ export async function handleCalendarEvents(req: IncomingMessage, res: ServerResp
     console.log('Validation result:', validation.success ? 'Valid' : 'Invalid');
     if (!validation.success) {
       console.error('Validation errors:', validation.error.issues);
-    }
-
-    if (!validation.success) {
+      
       const errorMessages = validation.error.issues.map(issue => 
         `${issue.path.join('.')}: ${issue.message}`
       ).join(', ');
@@ -97,7 +116,7 @@ export async function handleCalendarEvents(req: IncomingMessage, res: ServerResp
       return;
     }
 
-    const { accessToken, start_date, end_date, timezone } = validation.data;
+    const { start_date, end_date, timezone } = validation.data;
     
     // Parse dates (already validated by the schema)
     const startDate = new Date(start_date);
