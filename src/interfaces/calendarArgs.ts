@@ -1,5 +1,5 @@
 export default interface CalendarToolArgs {
-    user_id?: string;
+    accessToken: string;
     start_date?: string;
     end_date?: string;
     timezone?: string;

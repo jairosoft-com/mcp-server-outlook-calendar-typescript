@@ -1,6 +1,5 @@
-import { Client } from "@microsoft/microsoft-graph-client";
-import { ClientSecretCredential } from "@azure/identity";
-import { getAzureCredentials } from "./authService.js";
+import { CalendarEvent } from "../interfaces/calendarEvent.js";
+import { getGraphClient } from "./authService.js";
 
 // Define interfaces for Graph API responses
 interface GraphResponse<T> {
@@ -91,72 +90,10 @@ export interface CreateEventRequest {
   type?: 'singleInstance' | 'occurrence' | 'exception' | 'seriesMaster';
 }
 
-export interface CalendarEvent {
-  id: string;
-  subject: string;
-  start: {
-    dateTime: string;
-    timeZone: string;
-  };
-  end: {
-    dateTime: string;
-    timeZone: string;
-  };
-  organizer: {
-    emailAddress?: {
-      address: string;
-      name: string;
-    };
-    email_address?: {
-      address: string;
-      name: string;
-    };
-  };
-  location?: string | EventLocation | null;
-  onlineMeeting?: {
-    joinUrl?: string;
-    [key: string]: any;
-  } | null;
-  attendees?: Array<{
-    type: string;
-    status?: {
-      response: string;
-      time: string;
-    };
-    emailAddress?: {
-      address: string;
-      name: string;
-    };
-    email_address?: {
-      address: string;
-      name: string;
-    };
-  }>;
-  bodyPreview?: string;
-  webLink?: string;
-  [key: string]: any; // Allow additional properties
-}
-
 /**
  * Get an authenticated Microsoft Graph client
  * @returns Authenticated Graph client
  */
-export function getAuthenticatedClient(): Client {
-  const credentials = getAzureCredentials();
-  
-  // Initialize the client with auth provider
-  const client = Client.initWithMiddleware({
-    authProvider: {
-      getAccessToken: async () => {
-        // Request token with the required scopes
-        const tokenResponse = await credentials.getToken("https://graph.microsoft.com/.default");
-        return tokenResponse.token;
-      }
-    }
-  });
-
-  return client;
-}
 
 /**
  * Fetch calendar events for a user within a date range
@@ -166,11 +103,11 @@ export function getAuthenticatedClient(): Client {
  * @returns Array of calendar events
  */
 export async function fetchCalendarEvents(
-  userId: string,
+  accessToken: string,
   startDate: Date,
   endDate: Date
 ): Promise<CalendarEvent[]> {
-  const client = getAuthenticatedClient();
+  const client = getGraphClient(accessToken);
   const allEvents: CalendarEvent[] = [];
   let nextLink: string | undefined;
 
@@ -179,9 +116,9 @@ export async function fetchCalendarEvents(
     const startDateTime = startDate.toISOString();
     const endDateTime = endDate.toISOString();
 
-    // Initial request
+    // Initial request - using /me/calendar/calendarView since we're already authenticated with the user's token
     let response: GraphResponse<CalendarEvent[]> = await client
-      .api(`/users/${userId}/calendar/calendarView`)
+      .api('/me/calendar/calendarView')
       .query({
         startDateTime,
         endDateTime,
@@ -242,10 +179,10 @@ export interface CreateEventRequestExtended extends Omit<CreateEventRequest, 'st
 }
 
 export async function createCalendarEvent(
-  userId: string,
+  accessToken: string,
   eventData: CreateEventRequestExtended
 ): Promise<CalendarEvent> {
-  const client = getAuthenticatedClient();
+  const client = getGraphClient(accessToken);
   const timeZone = 'Asia/Manila';
   
   try {
@@ -416,7 +353,7 @@ export async function createCalendarEvent(
 
     // Create the event using Microsoft Graph API
     const createdEvent = await client
-      .api(`/users/${userId}/events`)
+      .api(`/me/events`)
       .post(eventPayload);
 
     return createdEvent;

@@ -46,24 +46,16 @@ export function registerCalendarTools(server: McpServer): void {
     async (args: unknown) => {
       // Get parameters with defaults
       let { 
-        user_id = 'me', 
+        accessToken,
         start_date = today, 
         end_date = tomorrowStr, 
         timezone = 'Asia/Manila' 
       } = args as CalendarToolArgs;
-      
-      // If user_id is 'me', use the USER_ID from .env
-      if (user_id === 'me') {
-        if (!process.env.USER_ID) {
-          return {
-            content: [{
-              type: "text",
-              text: "Error: USER_ID is not set in .env file"
-            }]
-          };
-        }
-        user_id = process.env.USER_ID;
+
+      if (!accessToken) {
+        throw new Error('Authentication required: No access token provided');
       }
+
       try {
         // Parse dates with provided or default values
         const startDate = parseDateInput(start_date || today, timezone || 'Asia/Manila');
@@ -73,7 +65,7 @@ export function registerCalendarTools(server: McpServer): void {
         endDate.setDate(endDate.getDate() + 1);
         
         // Fetch events from Microsoft Graph
-        const events = await fetchCalendarEvents(user_id, startDate, endDate);
+        const events = await fetchCalendarEvents(accessToken, startDate, endDate);
         const formattedEvents = formatCalendarEvents(events);
         
         // Format dates in the response to be more readable
@@ -186,9 +178,9 @@ export function registerCalendarTools(server: McpServer): void {
     createEventToolSchema,
     async (args: any) => {
       try {
-        // Handle user_id from .env if 'me' is specified
-        let { 
-          user_id, 
+        // Extract access token and other parameters from args
+        const { 
+          accessToken,
           is_recurring, 
           recurrence_type, 
           recurrence_interval, 
@@ -197,6 +189,10 @@ export function registerCalendarTools(server: McpServer): void {
           recurrence_occurrences,
           ...eventData 
         } = args;
+        
+        if (!accessToken) {
+          throw new Error('Authentication required: No access token provided');
+        }
         
         // Initialize event data with days_of_week if provided
         const eventDataWithRecurrence = {
@@ -234,18 +230,6 @@ export function registerCalendarTools(server: McpServer): void {
         
         // Use the event data with recurrence for the rest of the function
         const finalEventData = eventDataWithRecurrence;
-        
-        if (user_id === 'me') {
-          if (!process.env.USER_ID) {
-            return {
-              content: [{
-                type: "text",
-                text: "Error: USER_ID is not set in .env file"
-              }]
-            };
-          }
-          user_id = process.env.USER_ID;
-        }
 
         // Process attendees if provided (handle both string and array formats)
         const attendeeList = Array.isArray(finalEventData.attendees) 
@@ -271,8 +255,8 @@ export function registerCalendarTools(server: McpServer): void {
         
         console.error('Creating event with data:', JSON.stringify(cleanEventData, null, 2));
 
-        // Create the event using the Graph API
-        const event = await createCalendarEvent(user_id, cleanEventData);
+        // Create the event using the Graph API with the access token
+        const event = await createCalendarEvent(accessToken, cleanEventData);
         
         // Helper function to format date in the event's timezone
         const formatEventDate = (dateTimeStr?: string, timeZone: string = eventData.timezone) => {

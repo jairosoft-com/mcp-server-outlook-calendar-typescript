@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { authSchema } from './fetchCalendarEventsSchema.js';
 
 // Helper to get default start time (current time + 1 hour)
 const getDefaultStartTime = () => {
@@ -16,10 +17,8 @@ const formatLocalDateTime = (date: Date): string => {
 
 // Export the schema in the format expected by the tool registration
 export const createEventToolSchema = {
-  user_id: z.string()
-    .default("me")
-    .describe("Microsoft Graph user ID or 'me' to use USER_ID from .env. Example: me"),
-    
+  ...authSchema,
+  
   subject: z.string()
     .min(1, 'Subject is required')
     .default("Team Sync Meeting")
