@@ -1,29 +1,45 @@
-# Stage 1: Build the application locally first
-# This assumes the build is done on the host machine
+# Stage 1: Build the application
+FROM node:18.19.1-alpine3.19 AS builder
 
-# Stage 2: Create the runtime image
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY tsconfig*.json ./
+
+# Install dependencies and build
+RUN npm ci --legacy-peer-deps
+COPY src/ ./src/
+RUN npm run build
+
+# Verify build output
+RUN ls -la /app/dist
+
+# Stage 2: Create the production image
 FROM node:18.19.1-alpine3.19
 
 # Set working directory
 WORKDIR /app
 
 # Copy package files
-COPY . ./
+COPY package*.json ./
 
 # Install only production dependencies
-RUN npm ci --legacy-peer-deps
-RUN npm run build
+RUN npm ci --only=production --legacy-peer-deps
 
-# Copy built files from host
-COPY build/ ./build/
+# Copy built files from builder
+COPY --from=builder /app/dist ./dist
 
-# Make the entry point executable
-RUN chmod +x ./build/index.js
-
-# Add a test command to verify the image works
-RUN echo 'console.log("MCP Outlook Calendar Server is ready");' > /app/test.js
+# Verify files were copied
+RUN ls -la /app/dist
 
 # Set the entry point
-ENTRYPOINT ["node", "./build/index.js"]
+ENTRYPOINT ["node", "./dist/index.js"]
 
-# No need to expose ports as this is an STDIO server
+# Metadata
+LABEL description="MCP Server for Outlook Calendar with SSE support"
+
+# Health check (adjust the health check command as needed)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
