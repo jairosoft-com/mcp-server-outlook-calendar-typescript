@@ -1,78 +1,147 @@
-# MCP Server with Outlook Calendar Integration
+# Outlook Calendar SSE Server
 
-A Model Context Protocol (MCP) server implementation with Microsoft Calendar integration, built with TypeScript and Node.js. This server provides calendar event management through the MCP protocol with support for recurring events, timezone handling, and more.
-
-## Technology Stack
-
-- **Runtime**: Node.js 16.x or later
-- **Language**: TypeScript 4.9+
-- **Authentication**: Microsoft Identity Platform (Azure AD)
-- **APIs**: Microsoft Graph API
-- **Package Manager**: npm 7.x or later
+A lightweight server that provides real-time access to Microsoft Outlook Calendar events using Server-Sent Events (SSE).
 
 ## Features
 
-- **Calendar Integration**
-  - Create, read, and manage calendar events in Microsoft 365/Outlook
-  - Support for recurring events (daily, weekly, monthly patterns)
-  - Timezone support for event times
-  - Event filtering by date range
-
-- **Developer Experience**
-  - TypeScript support with strict type safety
-  - Environment-based configuration
-  - Comprehensive error handling
-  - Built-in development server with hot-reload
+- Real-time calendar event streaming via SSE
+- Create and manage calendar events
+- Timezone-aware event handling
+- Filter events by date range
 
 ## Prerequisites
 
-- Node.js 16.x or later
-- npm 7.x or later
-- A Microsoft 365 developer account or business account with calendar access
-- Azure AD application registration with necessary permissions
+- Node.js 18.x or later
+- npm 9.x or later
+- Microsoft 365 account with calendar access
+- Azure AD application with Calendar permissions
 
-## Claude Desktop Integration
+## Authentication
 
-To connect this MCP server to Claude Desktop, you'll need to configure it with your Azure AD credentials and project paths. Here's how to set it up:
+All endpoints require a valid access token in the `Authorization` header:
 
-1. Copy the example configuration file:
+```
+Authorization: Bearer <your-access-token>
+```
+
+## Quick Start
+
+1. Clone the repository
+2. Install dependencies:
    ```bash
-   cp claude-config.json.example claude-config.json
+   npm install
+   ```
+3. Build the project:
+   ```bash
+   npm run build
+   ```
+4. Start the server:
+   ```bash
+   npm run dev
    ```
 
-2. Edit `claude-config.json` with your actual values:
-   - Update the `NODE_PATH` with the full path to your project directory
-   - Replace all placeholder values with your actual Azure AD credentials
-   - Update the path in `args` to point to your built `index.js` file
+## Server-Sent Events (SSE) Endpoint
 
-3. In Claude Desktop, load this configuration file in the MCP servers settings.
+### Subscribe to Calendar Events
 
-### Configuration Notes:
-- All environment variables must be provided in the `env` object as Claude Desktop doesn't support loading from `.env` files directly
-- The server must be built (`npm run build`) before connecting from Claude Desktop
-- For security, never commit your actual `claude-config.json` with real credentials to version control
+```
+GET /events
+```
 
-### Example Configuration (with placeholders):
+**Headers:**
+- `Authorization: Bearer <access_token>`
+- `Accept: text/event-stream`
+- `Cache-Control: no-cache`
+- `Connection: keep-alive`
 
+**Query Parameters:**
+- `start_date`: Start date (ISO 8601 format)
+- `end_date`: End date (ISO 8601 format)
+- `timezone`: IANA timezone (e.g., 'America/New_York')
+
+**Example:**
+```
+GET /events?start_date=2025-07-16T00:00:00Z&end_date=2025-07-23T23:59:59Z&timezone=America/New_York
+```
+
+## Postman Collection
+
+### 1. Get Calendar Events
+
+**Request:**
+```
+GET /api/calendar/events
+```
+
+**Headers:**
+- `Authorization: Bearer <access_token>`
+- `Content-Type: application/json`
+
+**Query Parameters:**
+- `start_date`: Start date (ISO 8601 format)
+- `end_date`: End date (ISO 8601 format)
+- `timezone`: IANA timezone (e.g., 'America/New_York')
+
+### 2. Create Calendar Event
+
+**Request:**
+```
+POST /api/calendar/events
+```
+
+**Headers:**
+- `Authorization: Bearer <access_token>`
+- `Content-Type: application/json`
+
+**Body:**
 ```json
 {
-  "mcpServers": {
-    "calendar": {
-      "command": "node",
-      "env": {
-        "NODE_ENV": "production",
-        "NODE_PATH": "/path/to/mcp-server-outlook-calendar-typescript",
-        "AZURE_TENANT_ID": "your-azure-tenant-id",
-        "AZURE_CLIENT_ID": "your-azure-client-id",
-        "AZURE_CLIENT_SECRET": "your-azure-client-secret",
-        "USER_ID": "your-user-id-or-me",
-        "USER_EMAIL": "your-email@example.com"
-      },
-      "args": ["/path/to/mcp-server-outlook-calendar-typescript/build/index.js"]
-    }
-  }
+  "subject": "Team Meeting",
+  "start_datetime": "2025-07-20T10:00:00Z",
+  "end_datetime": "2025-07-20T11:00:00Z",
+  "timezone": "America/New_York",
+  "body": {
+    "content": "Weekly team sync",
+    "contentType": "text"
+  },
+  "attendees": ["user1@example.com", "user2@example.com"]
 }
 ```
+
+### 3. Get Specific Event
+
+**Request:**
+```
+GET /api/calendar/events/{eventId}
+```
+
+**Headers:**
+- `Authorization: Bearer <access_token>`
+- `Content-Type: application/json`
+
+### 4. Delete Event
+
+**Request:**
+```
+DELETE /api/calendar/events/{eventId}
+```
+
+**Headers:**
+- `Authorization: Bearer <access_token>`
+
+## Error Responses
+
+All error responses follow this format:
+```json
+{
+  "error": "Error message",
+  "details": "Additional error details"
+}
+```
+
+## License
+
+MIT
 
 ## Local Development Setup
 
@@ -87,15 +156,6 @@ cd mcp-server-outlook-calendar-typescript
 npm install
 ```
 
-### 3. Configure environment variables
-Create a `.env` file in the root directory with the following variables:
-
-```env
-# Microsoft Graph API (Calendar)
-AZURE_TENANT_ID=your-tenant-id
-AZURE_CLIENT_ID=your-client-id
-AZURE_CLIENT_SECRET=your-client-secret
-
 # Optional: Set timezone for calendar events (default: UTC)
 TZ=UTC
 ```
@@ -104,33 +164,6 @@ TZ=UTC
 ```bash
 npm run build
 ```
-
-## Running the Server
-
-### Using MCP Inspector (Recommended for Development)
-
-1. First, install ts-node globally if you haven't already:
-   ```bash
-   npm install -g ts-node
-   ```
-
-2. In one terminal, start the MCP inspector:
-   ```bash
-   mcp-inspector
-   ```
-
-3. In a second terminal, start the server:
-   ```bash
-   npx ts-node src/index.ts
-   ```
-   
-   Or if you've already built the project:
-   ```bash
-   npm run build
-   node build/index.js
-   ```
-
-The MCP inspector will provide a web interface at `http://localhost:6274` where you can test the calendar operations.
 
 ### Using Postman (API Testing)
 
@@ -170,16 +203,6 @@ The MCP inspector will provide a web interface at `http://localhost:6274` where 
    - Create a new client secret
    - Note down the secret value (it will only be shown once)
 
-### Configuration
-
-Update your `.env` file with the Azure AD credentials:
-
-```env
-# Microsoft Graph API
-AZURE_TENANT_ID=your-tenant-id
-AZURE_CLIENT_ID=your-client-id
-AZURE_CLIENT_SECRET=your-client-secret
-```
 
 ## Getting Started
 
@@ -200,24 +223,6 @@ AZURE_CLIENT_SECRET=your-client-secret
    ```bash
    npm run build
    ```
-
-### Configuration
-
-Create a `.env` file in the root directory with the following environment variables:
-
-```env
-# Weather Service
-DEBUG=false
-USER_AGENT=weather-app/1.0
-
-# Microsoft Graph API (Calendar)
-AZURE_TENANT_ID=your-tenant-id
-AZURE_CLIENT_ID=your-client-id
-AZURE_CLIENT_SECRET=your-client-secret
-
-# Optional: Set timezone for calendar events (default: UTC)
-TZ=UTC
-```
 
 ### Using the Calendar Tool
 

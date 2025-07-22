@@ -1,0 +1,127 @@
+{
+  "info": {
+    "name": "MCP Outlook Calendar API",
+    "description": "Postman collection for MCP Outlook Calendar API with SSE support",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "SSE Connection",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Accept",
+            "value": "text/event-stream",
+            "type": "text"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "no-cache",
+            "type": "text"
+          },
+          {
+            "key": "Connection",
+            "value": "keep-alive",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/events",
+          "host": ["{{base_url}}"],
+          "path": ["events"]
+        },
+        "description": "Establish an SSE connection to receive real-time calendar event updates."
+      },
+      "response": []
+    },
+    {
+      "name": "List Calendar Events",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/calendar/events?start_date=2025-07-16&end_date=2025-07-23&timezone=Asia/Manila",
+          "host": ["{{base_url}}"],
+          "path": ["api", "calendar", "events"],
+          "query": [
+            {
+              "key": "start_date",
+              "value": "2025-07-16",
+              "description": "Start date in YYYY-MM-DD format"
+            },
+            {
+              "key": "end_date",
+              "value": "2025-07-23",
+              "description": "End date in YYYY-MM-DD format"
+            },
+            {
+              "key": "timezone",
+              "value": "Asia/Manila",
+              "description": "IANA timezone"
+            }
+          ]
+        },
+        "description": "Retrieve calendar events within a date range"
+      },
+      "response": []
+    },
+    {
+      "name": "Create Calendar Event",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"subject\": \"Team Meeting\",\n  \"start_datetime\": \"2025-07-17T14:00:00+08:00\",\n  \"end_datetime\": \"2025-07-17T15:00:00+08:00\",\n  \"timezone\": \"Asia/Manila\",\n  \"is_online_meeting\": true,\n  \"location\": \"Microsoft Teams\",\n  \"attendees\": [\n    \"user1@example.com\",\n    \"user2@example.com\"\n  ],\n  \"importance\": \"High\",\n  \"body\": {\n    \"content\": \"<p>Let's discuss the project progress and next steps.</p>\",\n    \"contentType\": \"html\"\n  },\n  \"is_recurring\": true,\n  \"recurrence_type\": \"weekly\",\n  \"days_of_week\": [\n    \"monday\",\n    \"wednesday\",\n    \"friday\"\n  ],\n  \"recurrence_interval\": 1,\n  \"recurrence_range_type\": \"endDate\",\n  \"recurrence_end_date\": \"2025-12-31\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/calendar/events",
+          "host": ["{{base_url}}"],
+          "path": ["api", "calendar", "events"]
+        },
+        "description": "Create a new calendar event (supports both single and recurring events)"
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "your_access_token_here",
+      "type": "string"
+    }
+  ]
+}
