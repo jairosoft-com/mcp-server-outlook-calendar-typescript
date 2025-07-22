@@ -174,9 +174,10 @@ export class SseServer {
       });
 
       this.server.listen(this.port, () => {
-        console.log(`SSE Server running on http://localhost:${this.port}`);
-        console.log(`SSE endpoint: http://localhost:${this.port}/events`);
-        console.log(`Calendar API endpoint: http://localhost:${this.port}/api/calendar/events`);
+        const baseUrl = process.env.BASE_URL || `http://localhost:${this.port}`;
+        console.log(`SSE Server running on ${baseUrl}`);
+        console.log(`SSE endpoint: ${baseUrl}/events`);
+        console.log(`Calendar API endpoint: ${baseUrl}/api/calendar/events`);
         resolve();
       });
     });
