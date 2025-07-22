@@ -33,7 +33,7 @@ COPY --from=builder /app/dist ./dist
 
 # Verify files were copied
 RUN ls -la /app/dist
-
+EXPOSE 3000
 # Set the entry point
 ENTRYPOINT ["node", "./dist/index.js"]
 
