@@ -1,21 +1,32 @@
 import http from 'http';
 import { IncomingMessage, ServerResponse } from 'http';
 import { parse } from 'url';
+import { McpHandler } from './mcpHandler.js';
 
 export class SseServer {
   private server: http.Server;
   private clients: Map<string, ServerResponse> = new Map();
   private port: number;
 
+  private mcpHandler: McpHandler;
+
   constructor(port: number = 3000) {
     this.port = port;
     
     // Create HTTP server
     this.server = http.createServer(this.handleRequest.bind(this));
+    
+    // Initialize MCP handler
+    this.mcpHandler = new McpHandler(this);
   }
 
   private handleRequest(req: IncomingMessage, res: ServerResponse) {
-    const { pathname } = parse(req.url || '/', true);
+    const parsedUrl = parse(req.url || '/', true);
+    const pathname = parsedUrl.pathname;
+    
+    console.log(`Incoming request: ${req.method} ${req.url}`);
+    console.log('Pathname:', pathname);
+    console.log('Query params:', parsedUrl.query);
 
     // Set CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -30,7 +41,27 @@ export class SseServer {
     }
 
     // Route requests
-    if (pathname === '/events' && req.method === 'GET') {
+    if (pathname === '/health' && req.method === 'GET') {
+      // Health check endpoint
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        service: 'mcp-outlook-calendar',
+        version: '1.0.0'
+      }));
+    } else if (pathname === '/' && req.method === 'POST') {
+      // Handle MCP protocol requests
+      this.mcpHandler.handleRequest(req, res).catch(error => {
+        console.error('Error handling MCP request:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+          jsonrpc: '2.0',
+          error: { code: -32603, message: 'Internal error' },
+          id: null
+        }));
+      });
+    } else if (pathname === '/events' && req.method === 'GET') {
       this.handleSSEConnection(req, res);
     } else if (pathname === '/api/calendar/events') {
       if (req.method === 'GET') {
@@ -42,8 +73,23 @@ export class SseServer {
         res.end(JSON.stringify({ error: 'Method not allowed' }));
       }
     } else {
+      console.log('No matching route found for:', { 
+        method: req.method, 
+        pathname, 
+        url: req.url,
+        headers: req.headers 
+      });
       res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Endpoint not found' }));
+      res.end(JSON.stringify({ 
+        error: 'Endpoint not found',
+        method: req.method,
+        path: pathname,
+        availableEndpoints: [
+          { method: 'POST', path: '/', description: 'MCP protocol endpoint' },
+          { method: 'GET', path: '/events', description: 'SSE events' },
+          { method: ['GET', 'POST'], path: '/api/calendar/events', description: 'Calendar events API' }
+        ]
+      }));
     }
   }
 
