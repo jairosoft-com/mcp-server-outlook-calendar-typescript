@@ -41,6 +41,6 @@ ENTRYPOINT ["node", "./dist/index.js"]
 LABEL description="MCP Server for Outlook Calendar with SSE support"
 
 # Health check using environment variable for host
-ENV HEALTH_CHECK_URL=http://localhost:3000/health
+ENV HEALTH_CHECK_URL=http://0.0.0.0:3000/health
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider $HEALTH_CHECK_URL || exit 1
