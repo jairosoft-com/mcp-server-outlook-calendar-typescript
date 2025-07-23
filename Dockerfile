@@ -6,6 +6,7 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
+COPY tsconfig*.json ./
 COPY wrangler.jsonc ./
 
 # Install dependencies and required tools
@@ -15,7 +16,6 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-RUN npm ci --only=production --legacy-peer-deps
 # Build the project
 RUN npm run build
 
