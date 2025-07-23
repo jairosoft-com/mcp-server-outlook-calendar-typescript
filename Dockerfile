@@ -1,46 +1,32 @@
-# Stage 1: Build the application
-FROM node:18.19.1-alpine3.19 AS builder
+# Use Node.js LTS (Debian-based)
+FROM node:20-slim
 
 # Set working directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-COPY tsconfig*.json ./
+COPY wrangler.jsonc ./
 
-# Install dependencies and build
-RUN npm ci --legacy-peer-deps
-COPY src/ ./src/
+# Install dependencies and required tools
+RUN apt-get update && apt-get install -y python3 make g++
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Build the project
 RUN npm run build
 
-# Verify build output
-RUN ls -la /app/dist
+# Expose the port the app runs on
+EXPOSE 8787
 
-# Stage 2: Create the production image
-FROM node:18.19.1-alpine3.19
-
-# Set working directory
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install only production dependencies
-RUN npm ci --only=production --legacy-peer-deps
-
-# Copy built files from builder
-COPY --from=builder /app/dist ./dist
-
-# Verify files were copied
-RUN ls -la /app/dist
-EXPOSE 3000
-# Set the entry point
-ENTRYPOINT ["node", "./dist/index.js"]
-
-# Metadata
-LABEL description="MCP Server for Outlook Calendar with SSE support"
-
-# Health check using environment variable for host
-ENV HEALTH_CHECK_URL=http://0.0.0.0:3000/health
+# Add health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider $HEALTH_CHECK_URL || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:8787/ || exit 1
+
+# Set environment variables
+ENV NODE_ENV=production
+
+# Command to run the application
+CMD ["npm", "run", "dev"]
