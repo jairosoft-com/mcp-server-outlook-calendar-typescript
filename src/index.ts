@@ -1,56 +1,54 @@
-import { SseServer } from "./server/sseServer.js";
-import dotenv from 'dotenv';
+import { McpAgent } from "agents/mcp";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Env } from "./interface/calendarInterfaces";
+import { getCalendarEvents, createCalendarEvent, setAuthToken } from "./tools/calendarTools";
 
-dotenv.config();
+// Define our MCP agent with tools
+export class MyMCP extends McpAgent {
+	server = new McpServer({
+		name: "Microsoft Calendar Events Fetcher",
+		version: "1.0.0",
+	});
 
-// Get port from environment variable or use default
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+	async init() {
+		// Get tool definitions by calling the factory functions
+		const getEventsTool = getCalendarEvents();
+		const createEventTool = createCalendarEvent();
 
-// Create and start the SSE server
-const sseServer = new SseServer(PORT);
+		// Register the getCalendarEvents tool
+		this.server.tool(
+			getEventsTool.name,
+			getEventsTool.schema,
+			getEventsTool.handler
+		);
 
-// Handle graceful shutdown
-async function shutdown() {
-  console.log('Shutting down server...');
-  try {
-    await sseServer.stop();
-    console.log('Server stopped successfully');
-    process.exit(0);
-  } catch (error) {
-    console.error('Error during shutdown:', error);
-    process.exit(1);
-  }
+		// Register the createCalendarEvent tool
+		this.server.tool(
+			createEventTool.name,
+			createEventTool.schema,
+			createEventTool.handler
+		);
+    }
 }
 
-// Handle process termination
-process.on('SIGINT', () => {
-  console.log('Received SIGINT. Starting graceful shutdown...');
-  shutdown().catch(console.error);
-});
+export default {
+    fetch(request: Request, env: Env, ctx: ExecutionContext) {
+        const url = new URL(request.url);
+        const tokenFromUrl = url.searchParams.get('token');
+        const authToken = tokenFromUrl || env.AUTH_TOKEN;
+        
+        console.log('Auth token received:', authToken ? `${authToken.substring(0, 10)}...` : 'No token found');
+		
+		setAuthToken(authToken);
 
-process.on('SIGTERM', () => {
-  console.log('Received SIGTERM. Starting graceful shutdown...');
-  shutdown().catch(console.error);
-});
+		if (url.pathname === "/sse" || url.pathname === "/sse/message") {
+			return MyMCP.serveSSE("/sse").fetch(request, env, ctx);
+		}
 
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught exception:', error);
-  shutdown().catch(() => process.exit(1));
-});
+		if (url.pathname === "/mcp") {
+			return MyMCP.serve("/mcp").fetch(request, env, ctx);
+		}
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  shutdown().catch(console.error);
-});
-
-// Start the server
-sseServer.start()
-  .then(() => {
-    console.log(`Server started on port ${PORT}`);
-  })
-  .catch((error) => {
-    console.error("Fatal error starting server:", error);
-    process.exit(1);
-  });
+		return new Response("Not found", { status: 404 });
+	},
+};
