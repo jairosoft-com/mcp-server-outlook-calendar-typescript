@@ -10,7 +10,7 @@ This document explains how to build and run the MCP server in a Docker container
 ## Building the Docker Image
 
 ```bash
-docker build -t mcp-calendar-server .
+docker build -t mcp-outlook-calendar .
 ```
 
 ## Running the Container
@@ -18,7 +18,7 @@ docker build -t mcp-calendar-server .
 ### Basic Usage
 
 ```bash
-docker run -p 8787:8787 -e AUTH_TOKEN=your_auth_token mcp-calendar-server
+docker run -d -p 8787:8787 --name mcp-outlook-calendar mcp-outlook-calendar
 ```
 
 ### Environment Variables
@@ -36,7 +36,7 @@ docker run -p 8787:8787 -e AUTH_TOKEN=your_auth_token mcp-calendar-server
 
 2. Run the container:
    ```bash
-   docker run -p 8787:8787 --env-file .env mcp-calendar-server
+   docker run -d -p 8787:8787 --env-file .env --name mcp-outlook-calendar mcp-outlook-calendar
    ```
 
 ## Accessing the Server
