@@ -26,26 +26,47 @@ You can connect to your MCP server from the Cloudflare AI Playground, which is a
 2. Enter your deployed MCP server URL (`remote-mcp-server-authless.<your-account>.workers.dev/sse`)
 3. You can now use your MCP tools directly from the playground!
 
+## Authentication
+
+To obtain an authentication token:
+
+1. Visit: https://delegated-login-ui.thankfulground-ca4b1ba2.westus2.azurecontainerapps.io/
+2. Log in with your Microsoft account
+3. Copy the displayed authentication token (valid for 1 hour)
+
 ## Connect Claude Desktop to your MCP server
 
-You can also connect to your remote MCP server from local MCP clients, by using the [mcp-remote proxy](https://www.npmjs.com/package/mcp-remote).
+You can connect to your MCP server from local MCP clients using the [mcp-remote proxy](https://www.npmjs.com/package/mcp-remote).
 
-To connect to your MCP server from Claude Desktop, follow [Anthropic's Quickstart](https://modelcontextprotocol.io/quickstart/user) and within Claude Desktop go to Settings > Developer > Edit Config.
+### For local development:
 
-Update with this configuration:
+1. Follow [Anthropic's Quickstart](https://modelcontextprotocol.io/quickstart/user)
+2. In Claude Desktop, go to Settings > Developer > Edit Config
+3. Update with this configuration (replace `YOUR_AUTH_TOKEN` with the token from the authentication step):
 
 ```json
 {
   "mcpServers": {
-    "calculator": {
+    "outlook-calendar": {
       "command": "npx",
       "args": [
         "mcp-remote",
-        "http://localhost:8787/sse?token=your-token" // or remote-mcp-server-authless.your-account.workers.dev/sse?token=your-token
+        "http://127.0.0.1:8787/sse?token=YOUR_AUTH_TOKEN"
       ]
     }
   }
 }
+```
+
+### For production:
+
+Use the same configuration but replace the URL with your production endpoint:
+
+```json
+"args": [
+  "mcp-remote",
+  "https://your-production-url.com/sse?token=YOUR_AUTH_TOKEN"
+]
 ```
 
 Restart Claude and you should see the tools become available.
